@@ -85,13 +85,9 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
             const newMode = !currentMode;
             localStorage.setItem('darkMode', newMode);
             
-            // 同时添加/移除 dark 和 dark-mode 两个类
-            if (newMode) {
-                document.documentElement.classList.add('dark', 'dark-mode');
-                document.body.classList.add('dark', 'dark-mode');
-            } else {
-                document.documentElement.classList.remove('dark', 'dark-mode');
-                document.body.classList.remove('dark', 'dark-mode');
+            // 调用全局的 applyTheme 函数来应用主题
+            if (typeof applyTheme === 'function') {
+                applyTheme();
             }
             
             updateIcons();
