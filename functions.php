@@ -5,7 +5,13 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 主题后台配置面板
  */
 function themeConfig($form) {
-    // 1. 站点 Logo 文字
+    // 1. 语言设置 (新增)
+    $languageSetting = new Typecho_Widget_Helper_Form_Element_Radio('languageSetting',
+        array('en' => _t('English (英文)'), 'cn' => _t('Chinese (中文)')),
+        'en', _t('界面标题语言'), _t('切换侧边栏、评论区等标题的显示语言'));
+    $form->addInput($languageSetting);
+
+    // 2. 站点 Logo 文字
     $logoText = new Typecho_Widget_Helper_Form_Element_Text('logoText', NULL, NULL, _t('站点 Logo 文字'), _t('支持 HTML，例如 <span class="text-pink-600">.</span>'));
     $form->addInput($logoText);
 
@@ -33,7 +39,30 @@ function themeConfig($form) {
 }
 
 /**
- * 评论验证钩子 (新增)
+ * 获取主题多语言文本 (新增)
+ */
+function get_theme_text($key, $archive) {
+    // 修复点：使用 Helper::options() 获取全局配置，避免 $archive->options 为空导致的错误
+    $lang = Helper::options()->languageSetting;
+    if (empty($lang)) $lang = 'en'; // 默认为英文
+
+    $texts = array(
+        'search' => array('en' => 'SEARCH', 'cn' => '搜索'),
+        'categories' => array('en' => 'CATEGORIES', 'cn' => '分类'),
+        'comments' => array('en' => 'COMMENTS', 'cn' => '评论'),
+        'toc' => array('en' => 'TABLE OF CONTENTS', 'cn' => '文章目录'),
+        'leave_reply' => array('en' => 'LEAVE A REPLY', 'cn' => '发表评论'),
+        'submit_comment' => array('en' => 'SUBMIT COMMENT', 'cn' => '提交评论'),
+        'related_posts' => array('en' => 'YOU MAY ALSO LIKE', 'cn' => '相关推荐'),
+        'timeline_title' => array('en' => 'TIMELINE <span class="text-white">ARCHIVE</span>', 'cn' => '时间轴 <span class="text-white">归档</span>'),
+        'links_title' => array('en' => 'FRIENDS <span class="text-white">LINKS</span>', 'cn' => '友情 <span class="text-white">链接</span>'),
+    );
+
+    return isset($texts[$key][$lang]) ? $texts[$key][$lang] : '';
+}
+
+/**
+ * 评论验证钩子
  */
 class ThemeHooks {
     public static function verifyTurnstile($comment, $post) {
@@ -41,18 +70,15 @@ class ThemeHooks {
         $siteKey = $options->turnstileSiteKey;
         $secretKey = $options->turnstileSecretKey;
 
-        // 如果未配置密钥，直接放行
         if (empty($siteKey) || empty($secretKey)) {
             return $comment;
         }
 
-        // 获取前端提交的 token
         $token = Typecho_Request::getInstance()->get('cf-turnstile-response');
         if (empty($token)) {
             throw new Typecho_Widget_Exception(_t('请完成人机验证 (Please complete the CAPTCHA)'));
         }
 
-        // 调用 Cloudflare API 验证
         $ip = Typecho_Request::getInstance()->getIp();
         $url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
         $data = [
@@ -77,68 +103,7 @@ class ThemeHooks {
         return $comment;
     }
 }
-// 注册钩子
 Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verifyTurnstile');
-
-
-/**
- * 自定义评论输出结构
- */
-function threadedComments($comments, $options) {
-    $commentClass = '';
-    if ($comments->authorId) {
-        if ($comments->authorId == $comments->ownerId) {
-            $commentClass .= ' comment-by-author';
-        } else {
-            $commentClass .= ' comment-by-user';
-        }
-    }
-?>
-<li id="li-<?php $comments->theId(); ?>" class="comment-body<?php 
-    if ($comments->levels > 0) {
-        echo ' comment-child';
-        $comments->levelsAlt(' comment-level-odd', ' comment-level-even');
-    } else {
-        echo ' comment-parent';
-    }
-    $comments->alt(' comment-odd', ' comment-even');
-    echo $commentClass;
-?> mb-8 list-none">
-    <div id="<?php $comments->theId(); ?>" class="flex flex-col md:flex-row gap-4">
-        <div class="flex-shrink-0">
-            <div class="w-12 h-12 border-2 border-black overflow-hidden shadow-[2px_2px_0px_0px_#000]">
-                <?php $comments->gravatar('48', ''); ?>
-            </div>
-        </div>
-        <div class="flex-grow">
-            <div class="bg-white border-2 border-black p-4 relative shadow-[4px_4px_0px_0px_#1a1a1a] transition-transform hover:-translate-y-1">
-                <div class="absolute top-4 -left-2 w-4 h-4 bg-white border-b-2 border-l-2 border-black transform rotate-45 hidden md:block"></div>
-                <div class="absolute -top-2 left-4 w-4 h-4 bg-white border-t-2 border-l-2 border-black transform rotate-45 md:hidden"></div>
-                <div class="flex flex-wrap justify-between items-center mb-2 border-b-2 border-gray-100 pb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="font-black text-lg uppercase"><?php $comments->author(); ?></span>
-                        <?php if ($comments->authorId == $comments->ownerId): ?>
-                            <span class="bg-black text-white text-[10px] px-1 font-bold">AUTHOR</span>
-                        <?php endif; ?>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500 font-mono"><?php $comments->date('Y-m-d H:i'); ?></span>
-                </div>
-                <div class="font-medium text-gray-800 prose prose-sm max-w-none mb-3">
-                    <?php $comments->content(); ?>
-                </div>
-                <div class="text-right">
-                    <?php $comments->reply('<span class="inline-block text-xs font-black bg-black text-white px-2 py-1 hover:bg-pink-500 transition-colors cursor-pointer border-2 border-transparent hover:border-black">REPLY</span>'); ?>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php if ($comments->children) { ?>
-        <div class="comment-children ml-0 md:ml-16 mt-4 border-l-4 border-gray-200 pl-4">
-            <?php $comments->threadedComments($options); ?>
-        </div>
-    <?php } ?>
-</li>
-<?php } 
 
 /**
  * 核心逻辑：评论可见
@@ -214,6 +179,75 @@ function parseReplyContent($content, $archive) {
 }
 
 /**
+ * 摘要输出
+ */
+function printExcerpt($archive, $length = 140) {
+    $content = $archive->content;
+    $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
+    $content = strip_tags($content);
+    echo Typecho_Common::subStr($content, 0, $length, '...');
+}
+
+/**
+ * 自定义评论输出结构
+ */
+function threadedComments($comments, $options) {
+    $commentClass = '';
+    if ($comments->authorId) {
+        if ($comments->authorId == $comments->ownerId) {
+            $commentClass .= ' comment-by-author';
+        } else {
+            $commentClass .= ' comment-by-user';
+        }
+    }
+?>
+<li id="li-<?php $comments->theId(); ?>" class="comment-body<?php 
+    if ($comments->levels > 0) {
+        echo ' comment-child';
+        $comments->levelsAlt(' comment-level-odd', ' comment-level-even');
+    } else {
+        echo ' comment-parent';
+    }
+    $comments->alt(' comment-odd', ' comment-even');
+    echo $commentClass;
+?> mb-8 list-none">
+    <div id="<?php $comments->theId(); ?>" class="flex flex-col md:flex-row gap-4">
+        <div class="flex-shrink-0">
+            <div class="w-12 h-12 border-2 border-black overflow-hidden shadow-[2px_2px_0px_0px_#000]">
+                <?php $comments->gravatar('48', ''); ?>
+            </div>
+        </div>
+        <div class="flex-grow">
+            <div class="bg-white border-2 border-black p-4 relative shadow-[4px_4px_0px_0px_#1a1a1a] transition-transform hover:-translate-y-1">
+                <div class="absolute top-4 -left-2 w-4 h-4 bg-white border-b-2 border-l-2 border-black transform rotate-45 hidden md:block"></div>
+                <div class="absolute -top-2 left-4 w-4 h-4 bg-white border-t-2 border-l-2 border-black transform rotate-45 md:hidden"></div>
+                <div class="flex flex-wrap justify-between items-center mb-2 border-b-2 border-gray-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="font-black text-lg uppercase"><?php $comments->author(); ?></span>
+                        <?php if ($comments->authorId == $comments->ownerId): ?>
+                            <span class="bg-black text-white text-[10px] px-1 font-bold">AUTHOR</span>
+                        <?php endif; ?>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500 font-mono"><?php $comments->date('Y-m-d H:i'); ?></span>
+                </div>
+                <div class="font-medium text-gray-800 prose prose-sm max-w-none mb-3">
+                    <?php $comments->content(); ?>
+                </div>
+                <div class="text-right">
+                    <?php $comments->reply('<span class="inline-block text-xs font-black bg-black text-white px-2 py-1 hover:bg-pink-500 transition-colors cursor-pointer border-2 border-transparent hover:border-black">REPLY</span>'); ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php if ($comments->children) { ?>
+        <div class="comment-children ml-0 md:ml-16 mt-4 border-l-4 border-gray-200 pl-4">
+            <?php $comments->threadedComments($options); ?>
+        </div>
+    <?php } ?>
+</li>
+<?php } 
+
+/**
  * 文章阅读量统计
  */
 function getPostViews($archive) {
@@ -282,16 +316,6 @@ function getRelatedPosts($archive, $limit = 3) {
             }
         } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
     } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
-}
-
-/**
- * 摘要输出
- */
-function printExcerpt($archive, $length = 140) {
-    $content = $archive->content;
-    $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
-    $content = strip_tags($content);
-    echo Typecho_Common::subStr($content, 0, $length, '...');
 }
 
 /**

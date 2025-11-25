@@ -31,7 +31,7 @@
     <?php if ($this->is('post') || $this->is('page')): ?>
     <div id="toc-wrapper" class="p-6 md:p-10 border-b-4 border-black hidden">
         <h3 class="font-black text-xl mb-4 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-pink-500 border-2 border-black"></div> Table of Contents
+            <div class="w-4 h-4 bg-pink-500 border-2 border-black"></div> <?php echo get_theme_text('toc', $this); ?>
         </h3>
         <!-- 目录内容生成于此 -->
         <div class="toc-container font-bold text-sm"></div>
@@ -41,7 +41,7 @@
     <!-- 3. 搜索 -->
     <div class="p-6 md:p-10 border-b-4 border-black">
         <h3 class="font-black text-xl mb-4 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-yellow-400 border-2 border-black"></div> Search
+            <div class="w-4 h-4 bg-yellow-400 border-2 border-black"></div> <?php echo get_theme_text('search', $this); ?>
         </h3>
         <form method="post" action="<?php $this->options->siteUrl(); ?>" role="search" class="flex border-4 border-black focus-within:ring-4 ring-pink-400 transition-all shadow-none md:shadow-[4px_4px_0px_0px_#000]">
             <input type="text" name="s" placeholder="输入关键词..." class="w-full p-3 font-bold focus:outline-none bg-white placeholder-gray-400 text-black">
@@ -54,7 +54,7 @@
     <!-- 4. 分类 -->
     <div class="p-6 md:p-10 border-b-4 border-black">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-cyan-400 border-2 border-black"></div> Categories
+            <div class="w-4 h-4 bg-cyan-400 border-2 border-black"></div> <?php echo get_theme_text('categories', $this); ?>
         </h3>
         <ul class="space-y-3 font-bold text-lg">
             <?php $this->widget('Widget_Metas_Category_List')->to($category); ?>
@@ -69,7 +69,7 @@
     <!-- 5. 最新评论 -->
     <div class="p-6 md:p-10">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-lime-400 border-2 border-black"></div> Comments
+            <div class="w-4 h-4 bg-lime-400 border-2 border-black"></div> <?php echo get_theme_text('comments', $this); ?>
         </h3>
         <ul class="space-y-6 text-sm font-medium">
             <?php $this->widget('Widget_Comments_Recent')->to($comments); ?>

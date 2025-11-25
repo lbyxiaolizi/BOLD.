@@ -3,7 +3,6 @@
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black bg-white flex flex-col dark:border-[#10b981] dark:bg-[#121212]">
     <article class="flex-grow">
-        <!-- 文章头部元数据 -->
         <header class="p-6 md:p-10 border-b-4 border-black bg-yellow-50 relative overflow-hidden dark:border-[#10b981] dark:bg-[#262626]">
             <div class="absolute top-0 right-0 p-4 opacity-10 font-black text-9xl pointer-events-none dark:text-white/10">#</div>
             
@@ -30,24 +29,19 @@
             </div>
         </header>
 
-        <!-- 文章正文区域 -->
-        <!-- dark:prose-invert 是 Tailwind Typography 插件提供的反色类，用于暗黑模式 -->
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none prose-strong:font-black prose-strong:bg-pink-200 prose-strong:px-1 dark:prose-invert">
-            <!-- 使用自定义函数输出内容，支持评论可见逻辑 -->
             <?php echo parseReplyContent($this->content, $this); ?>
         </div>
 
-        <!-- 标签 -->
         <div class="px-6 md:px-10 pb-10 flex flex-wrap gap-2">
             <span class="font-black mr-2 text-lg">TAGS:</span>
             <?php $this->tags(' ', true, '无标签'); ?>
         </div>
 
-        <!-- 相关文章推荐模块 -->
         <div class="px-6 md:px-10 pb-10">
             <div class="border-4 border-black p-6 bg-white shadow-[4px_4px_0px_0px_#000] dark:bg-[#1e1e1e] dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981]">
                 <h3 class="font-black text-xl uppercase mb-4 flex items-center gap-2">
-                    <div class="w-4 h-4 bg-cyan-400 border-2 border-black dark:border-[#10b981] dark:bg-[#10b981]"></div> You May Also Like
+                    <div class="w-4 h-4 bg-cyan-400 border-2 border-black dark:border-[#10b981] dark:bg-[#10b981]"></div> <?php echo get_theme_text('related_posts', $this); ?>
                 </h3>
                 <ul class="space-y-3">
                     <?php getRelatedPosts($this); ?>

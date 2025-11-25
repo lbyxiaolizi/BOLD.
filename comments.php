@@ -3,7 +3,7 @@
     <?php $this->comments()->to($comments); ?>
     
     <h3 class="text-xl md:text-3xl font-black mb-4 md:mb-8 uppercase flex items-center gap-2 md:gap-3">
-        <span class="bg-black text-white px-1.5 md:px-2"><?php $this->commentsNum(_t('0'), _t('1'), _t('%d')); ?></span> Comments
+        <span class="bg-black text-white px-1.5 md:px-2"><?php $this->commentsNum(_t('0'), _t('1'), _t('%d')); ?></span> <?php echo get_theme_text('comments', $this); ?>
     </h3>
 
     <?php if($this->allow('comment')): ?>
@@ -13,7 +13,7 @@
             <?php $comments->cancelReply('<span class="text-xs font-bold text-red-500 underline">取消回复 / Cancel</span>'); ?>
         </div>
 
-        <h4 class="font-bold text-base md:text-lg mb-3 md:mb-4 uppercase border-b-2 border-black pb-2">Leave a Reply</h4>
+        <h4 class="font-bold text-base md:text-lg mb-3 md:mb-4 uppercase border-b-2 border-black pb-2"><?php echo get_theme_text('leave_reply', $this); ?></h4>
         
         <form method="post" action="<?php $this->commentUrl() ?>" id="comment-form">
             <?php if($this->user->hasLogin()): ?>
@@ -30,13 +30,12 @@
             
             <textarea name="text" rows="3" placeholder="Your Message..." class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors mb-3 md:mb-4 placeholder-gray-400 text-sm md:text-base" required><?php $this->remember('text'); ?></textarea>
             
-            <!-- Cloudflare Turnstile Widget (新增) -->
             <?php if($this->options->turnstileSiteKey): ?>
             <div class="mb-4 cf-turnstile" data-sitekey="<?php $this->options->turnstileSiteKey(); ?>" data-theme="auto"></div>
             <?php endif; ?>
 
             <button type="submit" class="w-full md:w-auto bg-black text-white px-4 py-2 md:px-8 md:py-3 font-black text-sm md:text-lg uppercase tracking-widest hover:bg-pink-500 transition-colors border-2 border-transparent hover:border-black shadow-none hover:shadow-[3px_3px_0px_0px_#000] md:hover:shadow-[4px_4px_0px_0px_#000]">
-                Submit Comment
+                <?php echo get_theme_text('submit_comment', $this); ?>
             </button>
         </form>
     </div>

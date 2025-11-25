@@ -23,7 +23,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
         <header class="p-6 md:p-10 border-b-4 border-black bg-cyan-400 relative overflow-hidden dark:border-[#10b981] dark:bg-[#10b981]">
             <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white rounded-full blur-3xl opacity-30 pointer-events-none"></div>
             <h1 class="text-4xl md:text-6xl font-black uppercase relative z-10">
-                TIMELINE <span class="text-white">ARCHIVE</span>.
+                <?php echo get_theme_text('timeline_title', $this); ?>
             </h1>
             <p class="mt-4 font-bold text-lg border-l-4 border-black pl-4 dark:border-black/50">
                 记录每一个闪光的瞬间。

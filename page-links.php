@@ -47,9 +47,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
     }
     
     body.dark-mode .links-grid li:hover {
-        /* 悬停时阴影变大，保持绿色 */
         box-shadow: 10px 10px 0px 0px #fff; 
-        /* 或者使用绿色阴影加强版，这里用白色作为强对比 */
     }
 
     .links-grid a {
@@ -84,12 +82,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black bg-white flex flex-col dark:border-[#10b981] dark:bg-[#121212]">
     <article class="flex-grow">
-        <!-- 头部 Banner: 粉色 -> 翡翠绿 -->
+        <!-- 头部 Banner -->
         <header class="p-6 md:p-10 border-b-4 border-black bg-pink-400 relative overflow-hidden dark:border-[#10b981] dark:bg-[#10b981]">
              <!-- 装饰 -->
             <div class="absolute -right-10 -top-10 w-40 h-40 bg-white rounded-full blur-3xl opacity-30 pointer-events-none"></div>
             <h1 class="text-4xl md:text-6xl font-black uppercase relative z-10">
-                FRIENDS <span class="text-white">LINKS</span>.
+                <?php echo get_theme_text('links_title', $this); ?>
             </h1>
             <p class="mt-4 font-bold text-lg border-l-4 border-black pl-4 dark:border-black/50">
                 连接未知的孤岛。
@@ -101,13 +99,14 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
                 // 获取内容
                 $content = $this->content;
                 // 正则替换：将 Markdown 的列表项 - [名字](链接) : 描述 转化为卡片结构
-                // 格式 1: - [Name](Link) : Desc
-                $pattern = '/<li>\s*<a href="(.*?)">(.*?)<\/a>\s*[:：]\s*(.*?)<\/li>/s';
+                // 增强正则：支持空格、横杠、冒号分隔，并支持无描述的情况，增加负向预查防重复
+                $pattern = '/<li>\s*<a href="(.*?)">(.*?)<\/a>(?!\s*<span)(?:\s*[:：-]?\s*|\s+)(.*?)<\/li>/s';
                 $replacement = '<li><a href="$1" target="_blank"><span class="link-title">$2</span><span class="link-desc">$3</span></a></li>';
+                // 先匹配有描述的
                 $content = preg_replace($pattern, $replacement, $content);
                 
-                // 格式 2: - [Name](Link) (无描述)
-                $pattern2 = '/<li>\s*<a href="(.*?)">(.*?)<\/a>\s*<\/li>/s';
+                // 再匹配无描述的 (排除已经被替换过的 target="_blank")
+                $pattern2 = '/<li>\s*<a href="(.*?)">(.*?)<\/a>(?!.*target="_blank")\s*<\/li>/s';
                 $replacement2 = '<li><a href="$1" target="_blank"><span class="link-title">$2</span><span class="link-desc"></span></a></li>';
                 $content = preg_replace($pattern2, $replacement2, $content);
                 
