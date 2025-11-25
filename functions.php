@@ -14,6 +14,10 @@ function themeConfig($form) {
     // 2. 站点 Logo 文字
     $logoText = new Typecho_Widget_Helper_Form_Element_Text('logoText', NULL, NULL, _t('站点 Logo 文字'), _t('支持 HTML，例如 <span class="text-pink-600">.</span>'));
     $form->addInput($logoText);
+    
+    $faviconUrl = new Typecho_Widget_Helper_Form_Element_Text('faviconUrl', NULL, NULL, _t('Favicon 图标 URL'), _t('浏览器标签页图标，留空则不显示'));
+    $form->addInput($faviconUrl);
+
 
     $avatarUrl = new Typecho_Widget_Helper_Form_Element_Text('avatarUrl', NULL, NULL, _t('个人头像 URL'), _t('输入头像图片的地址，将显示在侧边栏或个人卡片中'));
     $form->addInput($avatarUrl);
@@ -29,6 +33,16 @@ function themeConfig($form) {
     
     $email = new Typecho_Widget_Helper_Form_Element_Text('email', NULL, NULL, _t('email'), _t('您的email'));
     $form->addInput($email);
+    
+    $icpNum = new Typecho_Widget_Helper_Form_Element_Text('icpNum', NULL, NULL, _t('ICP 备案号'), _t('中国大陆网站需填写，显示在页脚'));
+    $form->addInput($icpNum);
+
+    // 7. 自定义头部/底部代码 (新增)
+    $customHead = new Typecho_Widget_Helper_Form_Element_Textarea('customHead', NULL, NULL, _t('自定义头部 HTML'), _t('位于 &lt;/head&gt; 之前，可填写自定义 CSS 或 验证 meta 标签'));
+    $form->addInput($customHead);
+
+    $customFooter = new Typecho_Widget_Helper_Form_Element_Textarea('customFooter', NULL, NULL, _t('自定义底部 HTML'), _t('位于 &lt;/body&gt; 之前，可填写 Google/百度统计代码或自定义 JS'));
+    $form->addInput($customFooter);
     
     // 5. Cloudflare Turnstile 配置 (新增)
     $turnstileSiteKey = new Typecho_Widget_Helper_Form_Element_Text('turnstileSiteKey', NULL, NULL, _t('Turnstile Site Key'), _t('Cloudflare Turnstile 站点密钥，留空则不启用'));
