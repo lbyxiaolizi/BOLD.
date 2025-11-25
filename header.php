@@ -12,6 +12,11 @@
             'author'    =>  _t('%s 发布的文章')
         ), '', ' - '); ?><?php $this->options->title(); ?></title>
     
+    <!-- Favicon -->
+    <?php if ($this->options->faviconUrl): ?>
+    <link rel="icon" href="<?php $this->options->faviconUrl(); ?>" />
+    <?php endif; ?>
+
     <meta name="description" content="<?php echo get_seo_description($this); ?>" />
     <meta name="keywords" content="<?php $this->keywords(','); ?>" />
     
@@ -34,7 +39,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.18.2/tocbot.css">
     
-    <!-- Cloudflare Turnstile JS (新增) -->
+    <!-- Cloudflare Turnstile JS -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
@@ -122,7 +127,6 @@
         .dark-mode .hover\:bg-yellow-100:hover,
         .dark-mode .hover\:bg-yellow-200:hover { 
             background-color: #2d2d2d !important;
-            /* border-color: var(--accent-color) !important; */
             color: var(--accent-color) !important; 
         }
         
@@ -232,6 +236,9 @@
         });
         window.onload = function() { document.body.classList.add('loaded'); };
     </script>
+
+    <!-- 自定义头部代码 (如验证Meta、自定义CSS) -->
+    <?php $this->options->customHead(); ?>
 
     <?php $this->header(); ?>
 </head>

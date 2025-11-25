@@ -7,8 +7,15 @@
     <div class="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
         <div class="text-center md:text-left">
             <h2 class="text-3xl md:text-4xl font-black mb-2 tracking-tighter">BOLD.</h2>
-            <!-- 修复：移除 text-gray-400，改为 text-white (浅色模式) 和 dark:text-black (深色模式)，并加粗 -->
-            <p class="text-white text-sm font-mono font-bold dark:text-black">&copy; <?php echo date('Y'); ?> <?php $this->options->title(); ?>. Powered by Typecho.</p>
+            <p class="text-white text-sm font-mono font-bold dark:text-black">
+                &copy; <?php echo date('Y'); ?> <?php $this->options->title(); ?>. Powered by Typecho.
+                
+                <!-- ICP 备案号 (新增) -->
+                <?php if ($this->options->icpNum): ?>
+                    <span class="mx-2">|</span>
+                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="nofollow" class="hover:underline"><?php $this->options->icpNum(); ?></a>
+                <?php endif; ?>
+            </p>
         </div>
     </div>
 </footer>
@@ -116,6 +123,9 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
         }
     });
 </script>
+
+<!-- 自定义底部代码 (统计代码等) -->
+<?php $this->options->customFooter(); ?>
 
 <?php $this->footer(); ?>
 </body>

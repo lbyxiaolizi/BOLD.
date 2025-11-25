@@ -53,12 +53,11 @@ function themeConfig($form) {
 }
 
 /**
- * 获取主题多语言文本 (新增)
+ * 获取主题多语言文本
  */
 function get_theme_text($key, $archive) {
-    // 修复点：使用 Helper::options() 获取全局配置，避免 $archive->options 为空导致的错误
     $lang = Helper::options()->languageSetting;
-    if (empty($lang)) $lang = 'en'; // 默认为英文
+    if (empty($lang)) $lang = 'en';
 
     $texts = array(
         'search' => array('en' => 'SEARCH', 'cn' => '搜索'),
