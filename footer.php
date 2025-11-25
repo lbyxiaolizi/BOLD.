@@ -67,8 +67,7 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
         const iconMoon = document.getElementById('icon-moon');
 
         function updateIcons() {
-            // 检查 dark 类而不是 dark-mode
-            const isDark = document.documentElement.classList.contains('dark');
+            const isDark = document.documentElement.classList.contains('dark-mode');
             if (isDark) {
                 iconSun.classList.remove('hidden');
                 iconMoon.classList.add('hidden');
@@ -85,11 +84,9 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
             const newMode = !currentMode;
             localStorage.setItem('darkMode', newMode);
             
-            // 调用全局的 applyTheme 函数来应用主题
             if (typeof applyTheme === 'function') {
                 applyTheme();
             }
-            
             updateIcons();
         });
 

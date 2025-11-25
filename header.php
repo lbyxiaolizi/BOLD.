@@ -78,20 +78,6 @@
     <?php endif; ?>
 
     <!-- 资源引用 -->
-    <script>
-        // 在 Tailwind 加载前设置 darkMode 为 class 策略
-        window.tailwind = window.tailwind || {};
-        window.tailwind.config = { darkMode: 'class' };
-
-        // 立即读取 localStorage 并应用主题类
-        var isDark = false;
-        try { isDark = localStorage.getItem('darkMode') === 'true'; } catch(e) {}
-        if (isDark) {
-            document.documentElement.classList.add('dark', 'dark-mode');
-        } else {
-            document.documentElement.classList.remove('dark', 'dark-mode');
-        }
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
@@ -123,8 +109,8 @@
             --dot-color: #e5e7eb;
         }
 
-        /* 暗黑模式 (Dark) - 同时支持 .dark 和 .dark-mode 类 */
-        .dark, .dark-mode {
+        /* 暗黑模式 (Dark) - 统一使用 .dark-mode 类 */
+        .dark-mode {
             --bg-page: #121212;          /* 深灰黑背景 */
             --bg-card: #1e1e1e;          /* 卡片背景 */
             --text-main: #e5e5e5;        /* 主文字 */
@@ -152,51 +138,54 @@
         /* --- 强制 Tailwind 类适配 (Universal Override) --- */
         
         /* 背景适配 */
-        .dark .bg-white, .dark-mode .bg-white { background-color: var(--bg-card) !important; color: var(--text-main) !important; }
-        .dark .bg-gray-50, .dark-mode .bg-gray-50 { background-color: #18181b !important; } 
-        .dark .bg-yellow-50, .dark-mode .bg-yellow-50 { background-color: #262626 !important; } 
-        .dark .bg-purple-50, .dark-mode .bg-purple-50 { background-color: #171717 !important; }
-        .dark .bg-purple-100, .dark-mode .bg-purple-100 { background-color: var(--accent-color) !important; color: #000 !important; }
+        .dark-mode .bg-white { background-color: var(--bg-card) !important; color: var(--text-main) !important; }
+        .dark-mode .bg-gray-50 { background-color: #18181b !important; } 
+        .dark-mode .bg-yellow-50 { background-color: #262626 !important; } 
+        .dark-mode .bg-purple-50 { background-color: #171717 !important; }
+        .dark-mode .bg-purple-100 { background-color: var(--accent-color) !important; color: #000 !important; }
         
         /* 文本适配 */
-        .dark .text-black, .dark-mode .text-black { color: var(--text-main) !important; }
-        .dark .text-gray-500, .dark .text-gray-600, .dark .text-gray-700, .dark .text-gray-800, .dark .text-gray-900,
-        .dark-mode .text-gray-500, .dark-mode .text-gray-600, .dark-mode .text-gray-700, .dark-mode .text-gray-800, .dark-mode .text-gray-900 { color: var(--text-muted) !important; }
+        .dark-mode .text-black { color: var(--text-main) !important; }
+        .dark-mode .text-gray-500, 
+        .dark-mode .text-gray-600, 
+        .dark-mode .text-gray-700, 
+        .dark-mode .text-gray-800, 
+        .dark-mode .text-gray-900 { color: var(--text-muted) !important; }
         
         /* 边框适配 */
-        .dark .border-black, .dark-mode .border-black { border-color: var(--border-color) !important; }
+        .dark-mode .border-black { border-color: var(--border-color) !important; }
         
         /* 按钮适配 */
-        .dark .bg-black, .dark-mode .bg-black { 
+        .dark-mode .bg-black { 
             background-color: var(--btn-bg) !important; 
             color: var(--btn-text) !important; 
         }
-        .dark .text-white, .dark-mode .text-white { color: var(--btn-text) !important; }
+        .dark-mode .text-white { color: var(--btn-text) !important; }
         
         /* 阴影适配 */
-        .dark [class*="shadow-"], .dark-mode [class*="shadow-"] {
+        .dark-mode [class*="shadow-"] {
             box-shadow: 4px 4px 0px 0px var(--border-color) !important;
         }
-        .dark .shadow-\[8px_8px_0px_0px_\#000\], .dark-mode .shadow-\[8px_8px_0px_0px_\#000\] { box-shadow: 8px 8px 0px 0px var(--border-color) !important; }
+        .dark-mode .shadow-\[8px_8px_0px_0px_\#000\] { box-shadow: 8px 8px 0px 0px var(--border-color) !important; }
         
         /* 交互悬停适配 */
-        .dark .hover\:bg-yellow-100:hover, .dark .hover\:bg-yellow-200:hover,
-        .dark-mode .hover\:bg-yellow-100:hover, .dark-mode .hover\:bg-yellow-200:hover { 
+        .dark-mode .hover\:bg-yellow-100:hover,
+        .dark-mode .hover\:bg-yellow-200:hover { 
             background-color: #2d2d2d !important;
             color: var(--accent-color) !important; 
         }
         
-        .dark .hover\:text-black:hover, .dark-mode .hover\:text-black:hover { color: var(--text-main) !important; }
-        .dark .group:hover .text-pink-600, .dark-mode .group:hover .text-pink-600 { color: var(--accent-color) !important; }
+        .dark-mode .hover\:text-black:hover { color: var(--text-main) !important; }
+        .dark-mode .group:hover .text-pink-600 { color: var(--accent-color) !important; }
 
         /* 侧边栏评论特殊适配 */
-        .dark .group .bg-purple-100, .dark .group .bg-gray-200,
-        .dark-mode .group .bg-purple-100, .dark-mode .group .bg-gray-200 { 
+        .dark-mode .group .bg-purple-100,
+        .dark-mode .group .bg-gray-200 { 
             background-color: var(--accent-color) !important; 
             color: #000 !important; 
         }
-        .dark .group:hover .bg-purple-100, .dark .group:hover .bg-gray-200,
-        .dark-mode .group:hover .bg-purple-100, .dark-mode .group:hover .bg-gray-200 {
+        .dark-mode .group:hover .bg-purple-100,
+        .dark-mode .group:hover .bg-gray-200 {
             background-color: #a855f7 !important;
             color: #fff !important;
         }
@@ -205,28 +194,27 @@
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-card); }
         ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #fff; }
-        .dark ::-webkit-scrollbar-thumb, .dark-mode ::-webkit-scrollbar-thumb { background: var(--border-color); border-color: #000; }
-        .dark ::-webkit-scrollbar-track, .dark-mode ::-webkit-scrollbar-track { background: #000; border-left: 3px solid var(--border-color); }
+        .dark-mode ::-webkit-scrollbar-thumb { background: var(--border-color); border-color: #000; }
+        .dark-mode ::-webkit-scrollbar-track { background: #000; border-left: 3px solid var(--border-color); }
 
         /* Prose 适配 */
-        .dark .prose, .dark-mode .prose { color: var(--text-main) !important; }
-        .dark .prose p, .dark .prose ul, .dark .prose ol,
+        .dark-mode .prose { color: var(--text-main) !important; }
         .dark-mode .prose p, .dark-mode .prose ul, .dark-mode .prose ol { color: var(--text-main) !important; }
-        .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose strong, .dark .prose b,
-        .dark-mode .prose h1, .dark-mode .prose h2, .dark-mode .prose h3, .dark-mode .prose strong, .dark-mode .prose b { color: #ffffff !important; }
-        .dark .prose a, .dark-mode .prose a { color: var(--accent-color) !important; border-bottom-color: var(--accent-color) !important; }
-        .dark .prose blockquote, .dark-mode .prose blockquote { 
+        .dark-mode .prose h1, .dark-mode .prose h2, .dark-mode .prose h3, 
+        .dark-mode .prose strong, .dark-mode .prose b { color: #ffffff !important; }
+        .dark-mode .prose a { color: var(--accent-color) !important; border-bottom-color: var(--accent-color) !important; }
+        .dark-mode .prose blockquote { 
             background-color: #262626 !important; 
             border-left-color: var(--border-color) !important; 
             color: var(--text-main) !important; 
         }
-        .dark .prose pre, .dark-mode .prose pre { 
+        .dark-mode .prose pre { 
             border-color: var(--border-color) !important; 
             box-shadow: 6px 6px 0px 0px var(--border-color) !important; 
         }
         
         /* 输入框 */
-        .dark input, .dark textarea, .dark-mode input, .dark-mode textarea { 
+        .dark-mode input, .dark-mode textarea { 
             background-color: #000 !important; 
             color: #fff !important; 
             border-color: var(--border-color) !important; 
@@ -258,7 +246,7 @@
         .hover-underline-animation:hover::after { transform: scaleX(1); transform-origin: bottom left; }
         
         /* TOC Active Link */
-        .dark .is-active-link, .dark-mode .is-active-link { background: var(--accent-color); color: #000 !important; box-shadow: 4px 4px 0px 0px #fff; }
+        .dark-mode .is-active-link { background: var(--accent-color); color: #000 !important; box-shadow: 4px 4px 0px 0px #fff; }
 
         /* --- TOC Sticky (目录悬浮) --- */
         #toc-wrapper {
@@ -278,11 +266,11 @@
         function applyTheme() {
             const isDark = localStorage.getItem('darkMode') === 'true';
             if (isDark) {
-                document.documentElement.classList.add('dark', 'dark-mode');
-                if (document.body) document.body.classList.add('dark', 'dark-mode');
+                document.documentElement.classList.add('dark-mode');
+                if (document.body) document.body.classList.add('dark-mode');
             } else {
-                document.documentElement.classList.remove('dark', 'dark-mode');
-                if (document.body) document.body.classList.remove('dark', 'dark-mode');
+                document.documentElement.classList.remove('dark-mode');
+                if (document.body) document.body.classList.remove('dark-mode');
             }
         }
         applyTheme();
