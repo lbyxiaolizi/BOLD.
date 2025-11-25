@@ -5,6 +5,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 主题后台配置面板
  */
 function themeConfig($form) {
+    // 1. 站点 Logo 文字
     $logoText = new Typecho_Widget_Helper_Form_Element_Text('logoText', NULL, NULL, _t('站点 Logo 文字'), _t('支持 HTML，例如 <span class="text-pink-600">.</span>'));
     $form->addInput($logoText);
 
@@ -22,7 +23,63 @@ function themeConfig($form) {
     
     $email = new Typecho_Widget_Helper_Form_Element_Text('email', NULL, NULL, _t('email'), _t('您的email'));
     $form->addInput($email);
+    
+    // 5. Cloudflare Turnstile 配置 (新增)
+    $turnstileSiteKey = new Typecho_Widget_Helper_Form_Element_Text('turnstileSiteKey', NULL, NULL, _t('Turnstile Site Key'), _t('Cloudflare Turnstile 站点密钥，留空则不启用'));
+    $form->addInput($turnstileSiteKey);
+
+    $turnstileSecretKey = new Typecho_Widget_Helper_Form_Element_Text('turnstileSecretKey', NULL, NULL, _t('Turnstile Secret Key'), _t('Cloudflare Turnstile 密钥，留空则不启用'));
+    $form->addInput($turnstileSecretKey);
 }
+
+/**
+ * 评论验证钩子 (新增)
+ */
+class ThemeHooks {
+    public static function verifyTurnstile($comment, $post) {
+        $options = Helper::options();
+        $siteKey = $options->turnstileSiteKey;
+        $secretKey = $options->turnstileSecretKey;
+
+        // 如果未配置密钥，直接放行
+        if (empty($siteKey) || empty($secretKey)) {
+            return $comment;
+        }
+
+        // 获取前端提交的 token
+        $token = Typecho_Request::getInstance()->get('cf-turnstile-response');
+        if (empty($token)) {
+            throw new Typecho_Widget_Exception(_t('请完成人机验证 (Please complete the CAPTCHA)'));
+        }
+
+        // 调用 Cloudflare API 验证
+        $ip = Typecho_Request::getInstance()->getIp();
+        $url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+        $data = [
+            'secret' => $secretKey,
+            'response' => $token,
+            'remoteip' => $ip
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $result = json_decode($response, true);
+        if (!$result['success']) {
+            throw new Typecho_Widget_Exception(_t('人机验证失败，请刷新重试'));
+        }
+
+        return $comment;
+    }
+}
+// 注册钩子
+Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verifyTurnstile');
+
 
 /**
  * 自定义评论输出结构
@@ -84,7 +141,80 @@ function threadedComments($comments, $options) {
 <?php } 
 
 /**
- * 文章阅读量统计函数
+ * 核心逻辑：评论可见
+ */
+function parseReplyContent($content, $archive) {
+    if (!$archive->is('single')) {
+        return preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
+    }
+
+    if (strpos($content, '{hide}') !== false) {
+        $db = Typecho_Db::get();
+        $hasComment = false;
+        
+        $user = Typecho_Widget::widget('Widget_User');
+
+        if ($user->hasLogin() && $user->uid == $archive->authorId) {
+            $hasComment = true;
+        }
+        elseif ($user->hasLogin()) {
+            $comment = $db->fetchRow($db->select()->from('table.comments')
+                ->where('cid = ?', $archive->cid)
+                ->where('authorId = ?', $user->uid)
+                ->limit(1));
+            if ($comment) $hasComment = true;
+        }
+        else {
+            $email = Typecho_Cookie::get('__typecho_remember_mail');
+            if ($email) {
+                $comment = $db->fetchRow($db->select()->from('table.comments')
+                    ->where('cid = ?', $archive->cid)
+                    ->where('mail = ?', $email)
+                    ->limit(1));
+                if ($comment) $hasComment = true;
+            }
+        }
+
+        if ($hasComment) {
+            $content = str_replace(array('{hide}', '{/hide}'), '', $content);
+            $content = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                            <p class="font-bold text-green-700 dark:text-green-400 m-0">🔓 内容已解锁 / UNLOCKED</p>
+                        </div>' . $content;
+        } else {
+            $hideNotice = '
+            <div class="reply2view-container my-8">
+                <div class="reply2view-inner flex flex-col items-center justify-center text-center p-6 md:p-10">
+                    <div class="text-6xl mb-4">🔒</div>
+                    <h3 class="text-2xl font-black uppercase mb-2">LOCKED CONTENT</h3>
+                    <p class="font-bold mb-6 max-w-md">此区域包含隐藏内容。<br>请在下方评论后刷新页面查看。</p>
+                    <a href="#comments" class="inline-block bg-black text-white px-8 py-3 font-black text-lg uppercase tracking-widest hover:bg-white hover:text-black transition-colors border-4 border-black shadow-[4px_4px_0px_0px_#fff] dark:shadow-[4px_4px_0px_0px_#10b981] dark:hover:bg-[#10b981] dark:hover:border-[#10b981]">
+                        去评论 / REPLY
+                    </a>
+                </div>
+            </div>
+            <style>
+                .reply2view-container {
+                    background: repeating-linear-gradient(45deg, #fef08a, #fef08a 20px, #000 20px, #000 40px);
+                    padding: 10px; border: 4px solid #000; box-shadow: 8px 8px 0px 0px #000;
+                }
+                .reply2view-inner { background: #fff; border: 4px solid #000; }
+                body.dark-mode .reply2view-container {
+                    background: repeating-linear-gradient(45deg, #064e3b, #064e3b 20px, #000 20px, #000 40px);
+                    border-color: #10b981; box-shadow: 8px 8px 0px 0px #10b981;
+                }
+                body.dark-mode .reply2view-inner { background: #121212; border-color: #10b981; color: #e5e5e5; }
+                body.dark-mode .reply2view-inner a.bg-black { background-color: #10b981; color: #000; border-color: #10b981; box-shadow: 4px 4px 0px 0px #000; }
+                body.dark-mode .reply2view-inner a.bg-black:hover { background-color: #000; color: #10b981; box-shadow: 4px 4px 0px 0px #10b981; }
+            </style>
+            ';
+            $content = preg_replace("/{hide}(.*?){\/hide}/sm", $hideNotice, $content);
+        }
+    }
+    return $content;
+}
+
+/**
+ * 文章阅读量统计
  */
 function getPostViews($archive) {
     $cid    = $archive->cid;
@@ -109,31 +239,26 @@ function getPostViews($archive) {
 }
 
 /**
- * 新增功能：获取预计阅读时间
+ * 获取阅读时间
  */
 function getReadingTime($archive) {
     $content = $archive->content;
     $content = ($content === null) ? '' : strval($content);
     $text = trim(strip_tags($content));
     $textLen = mb_strlen($text, 'UTF-8');
-    // 假设阅读速度为 300 字/分钟，最少 1 分钟
     $readTime = ceil($textLen / 300);
     return max(1, $readTime);
 }
 
 /**
- * 新增功能：获取相关文章 (基于标签)
+ * 获取相关文章
  */
 function getRelatedPosts($archive, $limit = 3) {
     $db = Typecho_Db::get();
     $tags = $archive->tags;
-    
     if ($tags) {
         $tagIds = array();
-        foreach ($tags as $tag) {
-            $tagIds[] = $tag['mid'];
-        }
-        
+        foreach ($tags as $tag) { $tagIds[] = $tag['mid']; }
         $related = $db->fetchAll($db->select()->from('table.contents')
             ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
             ->where('table.relationships.mid IN ?', $tagIds)
@@ -142,7 +267,6 @@ function getRelatedPosts($archive, $limit = 3) {
             ->where('table.contents.status = ?', 'publish')
             ->limit($limit)
             ->order('table.contents.created', Typecho_Db::SORT_DESC));
-            
         if ($related) {
             foreach ($related as $post) {
                 $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($post);
@@ -156,16 +280,22 @@ function getRelatedPosts($archive, $limit = 3) {
                         </a>
                       </li>";
             }
-        } else {
-            echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
-        }
-    } else {
-         echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
-    }
+        } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
+    } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
 }
 
 /**
- * SEO 助手函数
+ * 摘要输出
+ */
+function printExcerpt($archive, $length = 140) {
+    $content = $archive->content;
+    $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
+    $content = strip_tags($content);
+    echo Typecho_Common::subStr($content, 0, $length, '...');
+}
+
+/**
+ * SEO: 纯文本描述
  */
 function get_seo_description($archive) {
     if ($archive->is('index')) { return Helper::options()->description; }
@@ -185,6 +315,9 @@ function get_seo_description($archive) {
     return Helper::options()->description;
 }
 
+/**
+ * SEO: 封面图
+ */
 function get_og_image($archive) {
     $default_img = 'https://cdn.tailwindcss.com/img/card-top.jpg'; 
     if (($archive->is('post') || $archive->is('page'))) {

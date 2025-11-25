@@ -1,7 +1,6 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <?php $this->need('header.php'); ?>
 
-<!-- 修改点1: 添加 flex flex-col -->
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col">
     
     <!-- 归档头部 Banner -->
@@ -27,7 +26,8 @@
                     <a href="<?php $this->permalink() ?>"><?php $this->title() ?></a>
                 </h2>
                 <div class="text-base md:text-lg font-medium text-gray-700 mb-4 md:mb-6 line-clamp-3 group-hover:text-black">
-                    <?php $this->excerpt(120, '...'); ?>
+                    <!-- 修复点：使用自定义函数 printExcerpt -->
+                    <?php printExcerpt($this, 120); ?>
                 </div>
                 <a href="<?php $this->permalink() ?>" class="inline-flex items-center font-black text-base md:text-lg border-b-2 border-black hover:bg-blue-600 hover:text-white transition-all px-1">
                     阅读全文 <svg class="w-4 h-4 md:w-5 md:h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
@@ -40,7 +40,7 @@
         <?php endif; ?>
     </div>
 
-    <!-- 修改点2: 添加 mt-auto -->
+    <!-- 分页 -->
     <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold">
         <?php $this->pageLink('← 上一页', 'prev'); ?>
         <?php $this->pageLink('下一页 →', 'next'); ?>

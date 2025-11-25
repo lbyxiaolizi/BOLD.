@@ -33,6 +33,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.18.2/tocbot.css">
+    
+    <!-- Cloudflare Turnstile JS (新增) -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
         /* 防闪烁 (Anti-FOUC) */
@@ -115,13 +118,12 @@
         }
         .dark-mode .shadow-\[8px_8px_0px_0px_\#000\] { box-shadow: 8px 8px 0px 0px var(--border-color) !important; }
         
-        /* 交互悬停适配 - 重点修复 Categories 列表 */
-        /* 修复：添加 hover:bg-yellow-200 (Sidebar Categories) 和 hover:bg-yellow-100 (Post List) */
+        /* 交互悬停适配 */
         .dark-mode .hover\:bg-yellow-100:hover,
         .dark-mode .hover\:bg-yellow-200:hover { 
-            background-color: #2d2d2d !important; /* 悬停背景变深灰，避免亮瞎眼 */
-            /* border-color: var(--accent-color) !important;  移除边框变绿 */
-            color: var(--accent-color) !important; /* 强制文字为翡翠绿（主题色） */
+            background-color: #2d2d2d !important;
+            /* border-color: var(--accent-color) !important; */
+            color: var(--accent-color) !important; 
         }
         
         .dark-mode .hover\:text-black:hover { color: var(--text-main) !important; }
@@ -205,10 +207,10 @@
             z-index: 30;
             max-height: calc(100vh - 180px);
             overflow-y: auto;
-            background-color: var(--bg-card); /* 防止下方内容滚动上来时透视 */
-            scrollbar-width: none; /* Firefox 隐藏滚动条 */
+            background-color: var(--bg-card); 
+            scrollbar-width: none;
         }
-        #toc-wrapper::-webkit-scrollbar { display: none; /* Chrome/Safari 隐藏滚动条 */ }
+        #toc-wrapper::-webkit-scrollbar { display: none; }
     </style>
     
     <script>

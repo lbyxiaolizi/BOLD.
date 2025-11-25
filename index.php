@@ -11,7 +11,6 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 $this->need('header.php');
 ?>
 
-<!-- 修改点1: 添加 flex flex-col -->
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col">
     
     <!-- 文章循环区域 -->
@@ -34,7 +33,8 @@ $this->need('header.php');
                 </h2>
 
                 <div class="text-base md:text-lg font-medium text-gray-700 mb-4 md:mb-6 line-clamp-3 group-hover:text-black">
-                    <?php $this->excerpt(140, '...'); ?>
+                    <!-- 修复点：使用自定义函数 printExcerpt -->
+                    <?php printExcerpt($this, 140); ?>
                 </div>
 
                 <a href="<?php $this->permalink() ?>" class="inline-flex items-center font-black text-base md:text-lg border-b-2 border-black hover:bg-blue-600 hover:text-white transition-all px-1">
@@ -46,7 +46,7 @@ $this->need('header.php');
         <?php endwhile; ?>
     </div>
 
-    <!-- 修改点2: 添加 mt-auto -->
+    <!-- 分页 -->
     <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold">
         <?php $this->pageLink('← 上一页', 'prev'); ?>
         <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full">PAGE <?php if($this->_currentPage>1) echo $this->_currentPage;  else echo 1;?> / <?php echo ceil($this->getTotal() / $this->parameter->pageSize); ?></span>
