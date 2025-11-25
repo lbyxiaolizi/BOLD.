@@ -67,7 +67,8 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
         const iconMoon = document.getElementById('icon-moon');
 
         function updateIcons() {
-            const isDark = document.documentElement.classList.contains('dark-mode');
+            // 检查 dark 类而不是 dark-mode
+            const isDark = document.documentElement.classList.contains('dark');
             if (isDark) {
                 iconSun.classList.remove('hidden');
                 iconMoon.classList.add('hidden');
@@ -84,9 +85,15 @@ MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache:
             const newMode = !currentMode;
             localStorage.setItem('darkMode', newMode);
             
-            if (typeof applyTheme === 'function') {
-                applyTheme();
+            // 同时添加/移除 dark 和 dark-mode 两个类
+            if (newMode) {
+                document.documentElement.classList.add('dark', 'dark-mode');
+                document.body.classList.add('dark', 'dark-mode');
+            } else {
+                document.documentElement.classList.remove('dark', 'dark-mode');
+                document.body.classList.remove('dark', 'dark-mode');
             }
+            
             updateIcons();
         });
 
