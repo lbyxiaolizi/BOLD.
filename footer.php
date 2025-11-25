@@ -7,10 +7,11 @@
     <div class="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
         <div class="text-center md:text-left">
             <h2 class="text-3xl md:text-4xl font-black mb-2 tracking-tighter">BOLD.</h2>
+            <!-- 修复：移除 text-gray-400，改为 text-white (浅色模式) 和 dark:text-black (深色模式)，并加粗 -->
             <p class="text-white text-sm font-mono font-bold dark:text-black">
                 &copy; <?php echo date('Y'); ?> <?php $this->options->title(); ?>. Powered by Typecho.
                 
-                <!-- ICP 备案号 (新增) -->
+                <!-- ICP 备案号 -->
                 <?php if ($this->options->icpNum): ?>
                     <span class="mx-2">|</span>
                     <a href="https://beian.miit.gov.cn/" target="_blank" rel="nofollow" class="hover:underline"><?php $this->options->icpNum(); ?></a>
@@ -26,6 +27,11 @@
 <!-- 按钮组容器 -->
 <div class="fixed bottom-8 right-8 z-50 flex flex-col gap-3">
     
+    <!-- RSS 订阅按钮 (新增) -->
+    <a href="<?php $this->options->feedUrl(); ?>" target="_blank" class="bg-white text-black w-12 h-12 border-4 border-black shadow-[4px_4px_0px_0px_#000] flex items-center justify-center transition-all duration-300 hover:bg-orange-500 hover:text-white hover:-translate-y-1 transform dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:bg-[#121212] dark:text-[#10b981] dark:hover:bg-[#10b981] dark:hover:text-black" title="RSS Feed">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"></path></svg>
+    </a>
+
     <!-- 暗黑模式切换按钮 -->
     <button id="theme-toggle" class="bg-white text-black w-12 h-12 border-4 border-black shadow-[4px_4px_0px_0px_#000] flex items-center justify-center transition-all duration-300 hover:bg-black hover:text-white hover:-translate-y-1 transform dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:bg-[#121212] dark:text-[#10b981] dark:hover:bg-[#10b981] dark:hover:text-black">
         <!-- 太阳图标 (Light Mode) -->

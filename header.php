@@ -17,20 +17,65 @@
     <link rel="icon" href="<?php $this->options->faviconUrl(); ?>" />
     <?php endif; ?>
 
+    <!-- Canonical URL (SEO 核心: 规范化链接) -->
+    <link rel="canonical" href="<?php $this->permalink(); ?>" />
+
+    <!-- RSS & Atom Feeds (博客标配: 订阅源) -->
+    <link rel="alternate" type="application/rss+xml" title="<?php $this->options->title(); ?> &raquo; RSS 2.0" href="<?php $this->options->feedUrl(); ?>" />
+    <link rel="alternate" type="application/rdf+xml" title="<?php $this->options->title(); ?> &raquo; RSS 1.0" href="<?php $this->options->feedUrl('rss1'); ?>" />
+    <link rel="alternate" type="application/atom+xml" title="<?php $this->options->title(); ?> &raquo; Atom 1.0" href="<?php $this->options->feedUrl('atom'); ?>" />
+
+    <!-- Meta SEO -->
     <meta name="description" content="<?php echo get_seo_description($this); ?>" />
     <meta name="keywords" content="<?php $this->keywords(','); ?>" />
     
-    <!-- Open Graph / Twitter Card (SEO) -->
+    <!-- Open Graph / Twitter Card (社交分享优化) -->
     <meta property="og:site_name" content="<?php $this->options->title(); ?>" />
     <meta property="og:type" content="<?php echo $this->is('post') ? 'article' : 'website'; ?>" />
     <meta property="og:url" content="<?php $this->permalink(); ?>" />
     <meta property="og:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />
     <meta property="og:description" content="<?php echo get_seo_description($this); ?>" />
     <meta property="og:image" content="<?php echo get_og_image($this); ?>" />
+    <meta property="article:published_time" content="<?php $this->date('c'); ?>" />
+    <meta property="article:modified_time" content="<?php echo date('c', $this->modified); ?>" />
+    
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />
     <meta name="twitter:description" content="<?php echo get_seo_description($this); ?>" />
     <meta name="twitter:image" content="<?php echo get_og_image($this); ?>" />
+
+    <!-- JSON-LD Structured Data (Google 结构化数据) -->
+    <?php if ($this->is('post') || $this->is('page')): ?>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "<?php $this->title(); ?>",
+      "image": ["<?php echo get_og_image($this); ?>"],
+      "datePublished": "<?php $this->date('c'); ?>",
+      "dateModified": "<?php echo date('c', $this->modified); ?>",
+      "author": {
+        "@type": "Person",
+        "name": "<?php $this->author(); ?>"
+      },
+      "description": "<?php echo get_seo_description($this); ?>",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "<?php $this->permalink(); ?>"
+      }
+    }
+    </script>
+    <?php else: ?>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "<?php $this->options->title(); ?>",
+      "url": "<?php $this->options->siteUrl(); ?>",
+      "description": "<?php $this->options->description(); ?>"
+    }
+    </script>
+    <?php endif; ?>
 
     <!-- 资源引用 -->
     <script src="https://cdn.tailwindcss.com"></script>
