@@ -7,3 +7,5 @@
 </p>
 
 A BOLD. Typecho theme
+
+- 评论后可见 `{hide}` `{/hide}`
