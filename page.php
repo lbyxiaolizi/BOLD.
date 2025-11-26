@@ -1,6 +1,7 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <?php $this->need('header.php'); ?>
 
+
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black bg-white flex flex-col">
     <article class="flex-grow">
         <header class="p-6 md:p-10 border-b-4 border-black bg-white relative overflow-hidden">
@@ -26,7 +27,7 @@
                         <p class="font-bold text-gray-700 mb-4"><?php $this->options->descriptions(); ?></p>
                         <div class="flex flex-wrap gap-3 justify-center md:justify-start">
                              <?php if ($this->options->githubLink): ?>
-                                <a href="<?php $this->options->githubLink(); ?>" target="_blank" class="bg-black text-white border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
+                                <a href="<?php $this->options->githubLink(); ?>" target="_blank" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
                             <?php endif; ?>
                             
                             <?php if ($this->options->bilibiliLink): ?>

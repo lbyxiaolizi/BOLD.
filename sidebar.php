@@ -13,7 +13,7 @@
             
             <div class="flex gap-3">
                 <?php if ($this->options->githubLink): ?>
-                <a href="<?php $this->options->githubLink(); ?>" target="_blank" class="bg-black text-white border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
+                <a href="<?php $this->options->githubLink(); ?>" target="_blank" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
                 <?php endif; ?>
                 
                 <?php if ($this->options->bilibiliLink): ?>
