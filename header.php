@@ -287,8 +287,9 @@
 
     <?php $this->header(); ?>
 </head>
-<body class="flex flex-col min-h-screen border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">
-
+<!--<body class="flex flex-col min-h-screen border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">-->
+<body class="flex flex-col min-h-screen border-t-4 border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">
+    
 <header class="border-b-4 border-black p-6 md:p-10 bg-white sticky top-0 z-50 transition-colors duration-300">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div class="flex justify-between w-full md:w-auto items-center">

@@ -6,8 +6,10 @@
         <header class="p-6 md:p-10 border-b-4 border-black bg-yellow-50 relative overflow-hidden dark:border-[#10b981] dark:bg-[#262626]">
             <div class="absolute top-0 right-0 p-4 opacity-10 font-black text-9xl pointer-events-none dark:text-white/10">#</div>
             
-            <div class="flex flex-wrap gap-2 mb-4 relative z-10">
-                <span class="bg-blue-600 text-white px-3 py-1 border-2 border-black font-bold text-xs uppercase shadow-[2px_2px_0px_0px_#000] dark:border-[#10b981] dark:shadow-[2px_2px_0px_0px_#10b981]"><?php $this->category(','); ?></span>
+            <div class="flex flex-wrap gap-2 mb-4 relative z-10 items-center">
+                <!-- 调用新的彩色分类标签函数 -->
+                <?php printColoredCategories($this); ?>
+                
                 <span class="bg-white text-black px-3 py-1 border-2 border-black font-bold text-xs uppercase dark:bg-[#121212] dark:text-[#e5e5e5] dark:border-[#10b981]"><?php $this->date(); ?></span>
             </div>
             
@@ -33,12 +35,9 @@
             <?php echo parseReplyContent($this->content, $this); ?>
         </div>
 
-        <!-- 新增：版权与打赏区域 -->
         <div class="px-6 md:px-10 pb-6">
             <div class="bg-gray-50 border-2 border-black p-6 dark:bg-[#1e1e1e] dark:border-[#10b981]">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-6">
-                    
-                    <!-- 版权声明 (CC协议) -->
                     <div class="flex flex-col gap-2 text-center md:text-left w-full md:w-auto">
                         <div class="text-xs font-bold text-gray-600 dark:text-gray-400">
                             <p>本文由 <span class="text-black dark:text-white"><?php $this->author(); ?></span> 原创</p>
@@ -47,7 +46,6 @@
                         </div>
                     </div>
 
-                    <!-- 打赏按钮 -->
                     <button onclick="document.getElementById('reward-modal').classList.remove('hidden')" class="bg-pink-500 text-white px-6 py-2 font-black uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:translate-y-1 hover:shadow-none transition-all dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:hover:shadow-none flex-shrink-0">
                         $ 打赏一杯咖啡
                     </button>
@@ -55,21 +53,18 @@
             </div>
         </div>
 
-        <!-- 打赏模态框 -->
         <div id="reward-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="this.classList.add('hidden')">
             <div class="bg-white border-4 border-black p-8 max-w-sm w-full text-center relative shadow-[8px_8px_0px_0px_#db2777] dark:bg-[#121212] dark:border-[#10b981] dark:shadow-[8px_8px_0px_0px_#10b981]" onclick="event.stopPropagation()">
                 <h3 class="text-2xl font-black uppercase mb-6 dark:text-white">THANK YOU!</h3>
                 <div class="grid grid-cols-2 gap-4 mb-6">
                     <div class="text-center">
                         <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
-                            <!-- 请替换为您的微信二维码图片 -->
                             [微信二维码]
                         </div>
                         <span class="font-bold text-sm dark:text-gray-300">WeChat</span>
                     </div>
                     <div class="text-center">
                         <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
-                            <!-- 请替换为您的支付宝二维码图片 -->
                             [支付宝二维码]
                         </div>
                         <span class="font-bold text-sm dark:text-gray-300">Alipay</span>

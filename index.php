@@ -10,46 +10,35 @@
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 $this->need('header.php');
 
-// 定义随机颜色数组 (新粗野主义风格的亮色)
-$colors = [
-    'hover:bg-red-200',
-    'hover:bg-orange-200', 
-    'hover:bg-amber-200',
-    'hover:bg-yellow-200',
-    'hover:bg-lime-200',
-    'hover:bg-green-200',
-    'hover:bg-emerald-200',
-    'hover:bg-teal-200',
-    'hover:bg-cyan-200',
-    'hover:bg-sky-200',
-    'hover:bg-blue-200',
-    'hover:bg-indigo-200',
-    'hover:bg-violet-200',
-    'hover:bg-purple-200',
-    'hover:bg-fuchsia-200',
-    'hover:bg-pink-200',
-    'hover:bg-rose-200'
+// 定义文章卡片悬停颜色池
+$hoverColors = [
+    'hover:bg-red-200', 'hover:bg-orange-200', 'hover:bg-amber-200',
+    'hover:bg-yellow-200', 'hover:bg-lime-200', 'hover:bg-green-200',
+    'hover:bg-emerald-200', 'hover:bg-teal-200', 'hover:bg-cyan-200',
+    'hover:bg-sky-200', 'hover:bg-blue-200', 'hover:bg-indigo-200',
+    'hover:bg-violet-200', 'hover:bg-purple-200', 'hover:bg-fuchsia-200',
+    'hover:bg-pink-200', 'hover:bg-rose-200'
 ];
 ?>
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col dark:border-[#10b981]">
     
-    <!-- 文章循环区域 -->
     <div>
         <?php while($this->next()): ?>
         <?php 
-            // 为每篇文章随机选择一个颜色
-            $randomColor = $colors[array_rand($colors)];
+            // 随机卡片悬停颜色
+            $randomHover = $hoverColors[array_rand($hoverColors)];
         ?>
-        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group cursor-pointer relative overflow-hidden <?php echo $randomColor; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
-            <!-- 背景数字装饰 -->
+        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group cursor-pointer relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <span class="absolute -right-2 -bottom-4 md:-right-4 md:-bottom-10 text-[5rem] md:text-[10rem] font-black text-gray-100 opacity-50 z-0 pointer-events-none group-hover:text-white/50 transition-colors leading-none dark:text-[#1e1e1e] dark:group-hover:text-[#10b981]/20">
                 <?php $this->sequence(); ?>
             </span>
             
             <div class="relative z-10">
-                <div class="flex items-center gap-3 mb-3 md:mb-4 text-xs font-bold uppercase tracking-wider">
-                    <span class="bg-blue-600 text-white px-3 py-1 border-2 border-black shadow-[2px_2px_0px_0px_#000] dark:border-[#10b981] dark:shadow-[2px_2px_0px_0px_#10b981]"><?php $this->category(','); ?></span>
+                <div class="flex items-center gap-2 mb-3 md:mb-4 text-xs font-bold uppercase tracking-wider flex-wrap">
+                    <!-- 调用新的彩色分类标签函数 -->
+                    <?php printColoredCategories($this); ?>
+                    
                     <time class="bg-white px-2 py-1 border-2 border-black dark:bg-[#121212] dark:text-[#e5e5e5] dark:border-[#10b981]" datetime="<?php $this->date('c'); ?>"><?php $this->date(); ?></time>
                 </div>
 
@@ -70,7 +59,6 @@ $colors = [
         <?php endwhile; ?>
     </div>
 
-    <!-- 分页 -->
     <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">
         <?php $this->pageLink('← 上一页', 'prev'); ?>
         <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black">PAGE <?php if($this->_currentPage>1) echo $this->_currentPage;  else echo 1;?> / <?php echo ceil($this->getTotal() / $this->parameter->pageSize); ?></span>

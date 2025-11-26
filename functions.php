@@ -332,6 +332,35 @@ function getRelatedPosts($archive, $limit = 3) {
 }
 
 /**
+ * 输出带有独立颜色的分类标签 (新增)
+ */
+function printColoredCategories($archive) {
+    // 颜色池：高饱和度背景色，适合搭配 text-white
+    $colors = [
+        'bg-blue-600',
+        'bg-pink-600',
+        'bg-purple-600', 
+        'bg-green-600',
+        'bg-red-600', 
+        'bg-indigo-600',
+        'bg-cyan-600',
+        'bg-rose-600',
+        'bg-emerald-600',
+        'bg-fuchsia-600'
+    ];
+    
+    if ($archive->categories) {
+        foreach ($archive->categories as $category) {
+            // 根据分类MID取模，保证颜色固定
+            $colorIndex = $category['mid'] % count($colors);
+            $colorClass = $colors[$colorIndex];
+            
+            echo '<a href="' . $category['permalink'] . '" class="' . $colorClass . ' text-white px-3 py-1 border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all dark:border-[#10b981] dark:shadow-[2px_2px_0px_0px_#10b981] mr-2 no-underline">' . $category['name'] . '</a>';
+        }
+    }
+}
+
+/**
  * SEO: 纯文本描述
  */
 function get_seo_description($archive) {
