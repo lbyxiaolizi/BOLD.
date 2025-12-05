@@ -6,7 +6,7 @@
     <div class="absolute bottom-0 left-0 w-48 h-48 md:w-64 md:h-64 bg-blue-600 rounded-full blur-[80px] md:blur-[100px] opacity-20 pointer-events-none"></div>
     <div class="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
         <div class="text-center md:text-left">
-            <h2 class="text-3xl md:text-4xl font-black mb-2 tracking-tighter">BOLD.</h2>
+            <h2 class="text-3xl md:text-4xl font-black mb-2 tracking-tighter"><a href="https://github.com/lbyxiaolizi/BOLD." href="_blank">BOLD.</a></h2>
             <p class="text-white text-sm font-mono font-bold dark:text-black">
                 &copy; 2019-2025 <?php $this->options->title(); ?>. Powered by Typecho.
                 <?php if ($this->options->icpNum): ?>
