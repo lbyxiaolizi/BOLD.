@@ -65,8 +65,48 @@
             <?php endwhile; ?>
         </ul>
     </div>
+    <!-- 5. 标签云 (修正版: 动态字号) -->
+    <div class="p-6 md:p-10 border-b-4 border-black dark:border-[#10b981]">
+        <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2 dark:text-white">
+            <div class="w-4 h-4 bg-orange-500 border-2 border-black dark:border-[#10b981] dark:bg-[#10b981]"></div> <?php echo get_theme_text('tags', $this); ?>
+        </h3>
+        <div class="flex flex-wrap gap-2 items-end">
+            <?php 
+            $this->widget('Widget_Metas_Tag_Cloud', 'sort=count&ignoreZeroCount=1&desc=1&limit=50')->to($tags); 
+            $tag_list = array();
+            while ($tags->next()) {
+                $tag_list[] = array(
+                    'name' => $tags->name,
+                    'permalink' => $tags->permalink,
+                    'count' => $tags->count
+                );
+            }
+            
+            if (!empty($tag_list)) {
+                $counts = array_column($tag_list, 'count');
+                $max_count = max($counts);
+                $min_count = min($counts);
+                $spread = $max_count - $min_count;
+                if ($spread <= 0) $spread = 1;
+                
+                foreach ($tag_list as $tag) {
+                    // 计算字号 (0.75rem ~ 2.25rem)
+                    $size = 0.75 + (($tag['count'] - $min_count) / $spread) * 1.5;
+                    
+                    // 移除 text-sm，直接内联 font-size，并添加 leading-none 防止行高撑开
+                    echo '<a href="'.$tag['permalink'].'" style="font-size: '.$size.'rem; line-height: 1.2;" class="inline-block px-2 py-1 border-2 border-black bg-white font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all dark:bg-[#1e1e1e] dark:border-[#10b981] dark:text-white dark:shadow-[2px_2px_0px_0px_#10b981] hover:bg-orange-100 dark:hover:bg-[#2d2d2d] no-underline">';
+                    echo $tag['name'];
+                    echo '</a>';
+                }
+            } else {
+                echo '<span class="text-gray-500 font-bold dark:text-gray-400">暂无标签</span>';
+            }
+            ?>
+        </div>
+    </div>
 
-    <!-- 5. 最新评论 -->
+    
+    <!-- 6. 最新评论 -->
     <div class="p-6 md:p-10">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2">
             <div class="w-4 h-4 bg-lime-400 border-2 border-black"></div> <?php echo get_theme_text('comments', $this); ?>

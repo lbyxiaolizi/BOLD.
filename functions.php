@@ -63,6 +63,7 @@ function get_theme_text($key, $archive) {
         'search' => array('en' => 'SEARCH', 'cn' => '搜索'),
         'categories' => array('en' => 'CATEGORIES', 'cn' => '分类'),
         'comments' => array('en' => 'COMMENTS', 'cn' => '评论'),
+        'tags' => array('en' => 'TAGS', 'cn' => '标签'),
         'toc' => array('en' => 'TABLE OF CONTENTS', 'cn' => '文章目录'),
         'leave_reply' => array('en' => 'LEAVE A REPLY', 'cn' => '发表评论'),
         'submit_comment' => array('en' => 'SUBMIT COMMENT', 'cn' => '提交评论'),
@@ -306,6 +307,13 @@ function getRelatedPosts($archive, $limit = 3) {
     if ($tags) {
         $tagIds = array();
         foreach ($tags as $tag) { $tagIds[] = $tag['mid']; }
+
+        // 如果没有 tagIds 则直接返回空结果提示
+        if (empty($tagIds)) {
+            echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+            return;
+        }
+
         $related = $db->fetchAll($db->select()->from('table.contents')
             ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
             ->where('table.relationships.mid IN ?', $tagIds)
@@ -314,21 +322,33 @@ function getRelatedPosts($archive, $limit = 3) {
             ->where('table.contents.status = ?', 'publish')
             ->limit($limit)
             ->order('table.contents.created', Typecho_Db::SORT_DESC));
+
         if ($related) {
             foreach ($related as $post) {
                 $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($post);
-                $title = $post['title'];
-                $permalink = $post['permalink'];
-                $date = date('Y-m-d', $post['created']);
+
+                // 安全读取字段并提供回退值，避免 Undefined array key 警告
+                $permalink = isset($post['permalink']) ? $post['permalink'] : ($post['url'] ?? '#');
+                $title = htmlspecialchars($post['title'] ?? '', ENT_QUOTES, 'UTF-8');
+                $created = isset($post['created']) ? intval($post['created']) : 0;
+                $date = $created ? date('Y-m-d', $created) : '';
+
+                // 对 URL 做基本的 HTML 转义
+                $permalink_escaped = htmlspecialchars($permalink, ENT_QUOTES, 'UTF-8');
+
                 echo "<li>
-                        <a href='$permalink' class='flex justify-between items-center border-2 border-black p-3 hover:bg-yellow-200 transition-colors group'>
-                            <span class='font-bold truncate group-hover:text-pink-600 transition-colors'>$title</span>
-                            <span class='text-xs font-mono whitespace-nowrap ml-2 bg-black text-white px-1'>$date</span>
+                        <a href=\"{$permalink_escaped}\" class='flex justify-between items-center border-2 border-black p-3 hover:bg-yellow-200 transition-colors group'>
+                            <span class='font-bold truncate group-hover:text-pink-600 transition-colors'>{$title}</span>
+                            <span class='text-xs font-mono whitespace-nowrap ml-2 bg-black text-white px-1'>{$date}</span>
                         </a>
                       </li>";
             }
-        } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
-    } else { echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>'; }
+        } else {
+            echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+        }
+    } else {
+        echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+    }
 }
 
 /**
