@@ -304,50 +304,138 @@ function getReadingTime($archive) {
 function getRelatedPosts($archive, $limit = 3) {
     $db = Typecho_Db::get();
     $tags = $archive->tags;
-    if ($tags) {
-        $tagIds = array();
-        foreach ($tags as $tag) { $tagIds[] = $tag['mid']; }
 
-        // 如果没有 tagIds 则直接返回空结果提示
-        if (empty($tagIds)) {
-            echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
-            return;
-        }
-
-        $related = $db->fetchAll($db->select()->from('table.contents')
-            ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-            ->where('table.relationships.mid IN ?', $tagIds)
-            ->where('table.contents.cid != ?', $archive->cid)
-            ->where('table.contents.type = ?', 'post')
-            ->where('table.contents.status = ?', 'publish')
-            ->limit($limit)
-            ->order('table.contents.created', Typecho_Db::SORT_DESC));
-
-        if ($related) {
-            foreach ($related as $post) {
-                $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($post);
-
-                // 安全读取字段并提供回退值，避免 Undefined array key 警告
-                $permalink = isset($post['permalink']) ? $post['permalink'] : ($post['url'] ?? '#');
-                $title = htmlspecialchars($post['title'] ?? '', ENT_QUOTES, 'UTF-8');
-                $created = isset($post['created']) ? intval($post['created']) : 0;
-                $date = $created ? date('Y-m-d', $created) : '';
-
-                // 对 URL 做基本的 HTML 转义
-                $permalink_escaped = htmlspecialchars($permalink, ENT_QUOTES, 'UTF-8');
-
-                echo "<li>
-                        <a href=\"{$permalink_escaped}\" class='flex justify-between items-center border-2 border-black p-3 hover:bg-yellow-200 transition-colors group'>
-                            <span class='font-bold truncate group-hover:text-pink-600 transition-colors'>{$title}</span>
-                            <span class='text-xs font-mono whitespace-nowrap ml-2 bg-black text-white px-1'>{$date}</span>
-                        </a>
-                      </li>";
-            }
-        } else {
-            echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
-        }
-    } else {
+    if (empty($tags)) {
         echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+        return;
+    }
+
+    // 收集 tag id
+    $tagIds = array();
+    foreach ($tags as $tag) {
+        if (isset($tag['mid'])) $tagIds[] = $tag['mid'];
+    }
+
+    if (empty($tagIds)) {
+        echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+        return;
+    }
+
+    // 获取站点 URL（用于生成伪静态回退链接）
+    $options = Typecho_Widget::widget('Widget_Options');
+    $siteUrl = rtrim($options->siteUrl ?? '', '/');
+
+    // 查询：通过 relationships 找到同 tag 的文章，去重 contents.cid，按创建时间倒序
+    $select = $db->select()->from('table.contents')
+        ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+        ->where('table.relationships.mid IN ?', $tagIds)
+        ->where('table.contents.cid != ?', $archive->cid)
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish')
+        ->group('table.contents.cid')
+        ->order('table.contents.created', Typecho_Db::SORT_DESC)
+        ->limit($limit);
+
+    $related = $db->fetchAll($select);
+
+    if (empty($related)) {
+        echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+        return;
+    }
+
+    // slugify（用于 post slug，保留小写行为）
+    $slugify = function ($text) {
+        $text = (string)$text;
+        $text = preg_replace('~[^\pL\d]+~u', '-', $text);
+        $text = iconv('UTF-8', 'ASCII//TRANSLIT', $text) ?: $text;
+        $text = preg_replace('~[^-\w]+~', '', $text);
+        $text = trim($text, '-');
+        $text = strtolower($text); // post slug 通常小写
+        if (empty($text)) return 'post-' . time();
+        return $text;
+    };
+
+    // category 处理函数：清理不合法字符但不强制小写（保留原大小写以匹配站点 URL）
+    $sanitizeCategorySegment = function ($text) {
+        $text = (string)$text;
+        // 将空白和特殊字符替换为短横
+        $text = preg_replace('~[^\pL\d]+~u', '-', $text);
+        // 尝试把非 ASCII 字符转为近似 ASCII（可选），iconv 失败则保留原
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT', $text);
+        if ($converted !== false) $text = $converted;
+        // 去掉不安全字符，但不 strtolower
+        $text = preg_replace('~[^-\w]+~', '', $text);
+        $text = trim($text, '-');
+        if ($text === '') return 'uncategorized';
+        return $text;
+    };
+
+    foreach ($related as $row) {
+        $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($row);
+
+        // 优先使用已有 permalink/url
+        $permalink = $post['permalink'] ?? $post['url'] ?? null;
+
+        // 如果没有 permalink，按伪静态 /{category}/{slug}.html 生成
+        if (empty($permalink)) {
+            // 先尝试从 $post['categories'] 取得第一个 category 的 slug 或 name
+            $category_segment = null;
+            if (!empty($post['categories']) && is_array($post['categories'])) {
+                $firstCat = reset($post['categories']);
+                if (!empty($firstCat['slug'])) {
+                    // 如果数据库里有 slug，直接使用（保留其原有大小写）
+                    $category_segment = $firstCat['slug'];
+                } elseif (!empty($firstCat['name'])) {
+                    // 否则使用 name，经 sanitize 但保留大小写
+                    $category_segment = $sanitizeCategorySegment($firstCat['name']);
+                }
+            }
+
+            // 若没有，从数据库查 relationship -> metas 中的 category（取第一个）
+            if (empty($category_segment) && !empty($post['cid'])) {
+                $catRow = $db->fetchRow($db->select('table.metas.slug, table.metas.name')
+                    ->from('table.relationships')
+                    ->join('table.metas', 'table.relationships.mid = table.metas.mid')
+                    ->where('table.relationships.cid = ?', $post['cid'])
+                    ->where('table.metas.type = ?', 'category')
+                    ->limit(1));
+                if ($catRow) {
+                    if (!empty($catRow['slug'])) {
+                        $category_segment = $catRow['slug'];
+                    } elseif (!empty($catRow['name'])) {
+                        $category_segment = $sanitizeCategorySegment($catRow['name']);
+                    }
+                }
+            }
+
+            if (empty($category_segment)) {
+                $category_segment = 'uncategorized';
+            }
+
+            // post slug：优先 post['slug']，否则从 title 生成（使用小写 slugify）
+            $post_slug_raw = $post['slug'] ?? $post['title'] ?? $post['cid'] ?? '';
+            $post_slug = $post['slug'] ?? $slugify($post_slug_raw);
+
+            // 生成伪静态链接
+            if (!empty($siteUrl)) {
+                $permalink = $siteUrl . '/' . $category_segment . '/' . $post_slug . '.html';
+            } else {
+                $permalink = '/' . $category_segment . '/' . $post_slug . '.html';
+            }
+        }
+
+        // 安全输出
+        $permalink_escaped = htmlspecialchars($permalink ?? '#', ENT_QUOTES, 'UTF-8');
+        $title = htmlspecialchars($post['title'] ?? '', ENT_QUOTES, 'UTF-8');
+        $created = isset($post['created']) ? intval($post['created']) : 0;
+        $date = $created ? date('Y-m-d', $created) : '';
+
+        echo "<li>
+                <a href=\"{$permalink_escaped}\" class='flex justify-between items-center border-2 border-black p-3 hover:bg-yellow-200 transition-colors group'>
+                    <span class='font-bold truncate group-hover:text-pink-600 transition-colors'>{$title}</span>
+                    <span class='text-xs font-mono whitespace-nowrap ml-2 bg-black text-white px-1'>{$date}</span>
+                </a>
+              </li>";
     }
 }
 

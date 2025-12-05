@@ -90,10 +90,9 @@
                 if ($spread <= 0) $spread = 1;
                 
                 foreach ($tag_list as $tag) {
-                    // 计算字号 (0.75rem ~ 2.25rem)
-                    $size = 0.75 + (($tag['count'] - $min_count) / $spread) * 1.5;
+                    // 修复：字号范围调整为 0.75rem ~ 1.1rem (约 12px ~ 17.6px)
+                    $size = 0.75 + (($tag['count'] - $min_count) / $spread) * 0.35;
                     
-                    // 移除 text-sm，直接内联 font-size，并添加 leading-none 防止行高撑开
                     echo '<a href="'.$tag['permalink'].'" style="font-size: '.$size.'rem; line-height: 1.2;" class="inline-block px-2 py-1 border-2 border-black bg-white font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all dark:bg-[#1e1e1e] dark:border-[#10b981] dark:text-white dark:shadow-[2px_2px_0px_0px_#10b981] hover:bg-orange-100 dark:hover:bg-[#2d2d2d] no-underline">';
                     echo $tag['name'];
                     echo '</a>';
