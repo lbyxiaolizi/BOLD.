@@ -82,6 +82,7 @@
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.18.2/tocbot.css">
     
     <!-- Cloudflare Turnstile JS -->
@@ -252,6 +253,193 @@
             .prose .MathJax,
             .prose mjx-container {
                 font-size: 0.9em;
+            }
+        }
+
+        /* ====== 代码块粗野风格样式 (Brutalist Code Blocks) ====== */
+        
+        /* 代码块容器 - 粗野风格 */
+        .prose pre[class*="language-"] {
+            background: #1e1e1e !important;
+            border: 4px solid #000 !important;
+            border-radius: 0 !important;
+            box-shadow: 8px 8px 0px 0px #000 !important;
+            margin: 2rem 0 !important;
+            padding: 1.5rem !important;
+            position: relative;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 0.95rem !important;
+            line-height: 1.6 !important;
+        }
+
+        /* 行内代码 - 粗野风格 */
+        .prose code:not([class*="language-"]) {
+            background: #fef08a !important;
+            color: #000 !important;
+            padding: 0.2em 0.4em !important;
+            border: 2px solid #000 !important;
+            border-radius: 0 !important;
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 0.9em !important;
+            font-weight: 700 !important;
+        }
+
+        /* 代码块内的代码文本 */
+        .prose pre[class*="language-"] code {
+            background: transparent !important;
+            padding: 0 !important;
+            border: none !important;
+            color: #f8f8f2 !important;
+            font-size: inherit !important;
+            font-weight: 400 !important;
+        }
+
+        /* Prism Toolbar 样式 - 粗野风格 */
+        div.code-toolbar {
+            position: relative;
+        }
+
+        div.code-toolbar > .toolbar {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            z-index: 10;
+        }
+
+        div.code-toolbar > .toolbar button {
+            background: #fef08a !important;
+            color: #000 !important;
+            border: 3px solid #000 !important;
+            border-radius: 0 !important;
+            padding: 0.4rem 0.8rem !important;
+            font-family: 'Noto Sans SC', sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 0.75rem !important;
+            text-transform: uppercase !important;
+            cursor: pointer !important;
+            box-shadow: 3px 3px 0px 0px #000 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        div.code-toolbar > .toolbar button:hover {
+            background: #fff !important;
+            transform: translate(2px, 2px) !important;
+            box-shadow: 1px 1px 0px 0px #000 !important;
+        }
+
+        /* 代码高亮颜色优化 (基于 Okaidia 主题) */
+        .token.comment,
+        .token.prolog,
+        .token.doctype,
+        .token.cdata {
+            color: #8292a2 !important;
+        }
+
+        .token.punctuation {
+            color: #f8f8f2 !important;
+        }
+
+        .token.property,
+        .token.tag,
+        .token.constant,
+        .token.symbol,
+        .token.deleted {
+            color: #f92672 !important;
+        }
+
+        .token.boolean,
+        .token.number {
+            color: #ae81ff !important;
+        }
+
+        .token.selector,
+        .token.attr-name,
+        .token.string,
+        .token.char,
+        .token.builtin,
+        .token.inserted {
+            color: #a6e22e !important;
+        }
+
+        .token.operator,
+        .token.entity,
+        .token.url,
+        .language-css .token.string,
+        .style .token.string,
+        .token.variable {
+            color: #f8f8f2 !important;
+        }
+
+        .token.atrule,
+        .token.attr-value,
+        .token.function,
+        .token.class-name {
+            color: #e6db74 !important;
+        }
+
+        .token.keyword {
+            color: #66d9ef !important;
+        }
+
+        .token.regex,
+        .token.important {
+            color: #fd971f !important;
+        }
+
+        /* 暗黑模式代码块适配 */
+        .dark-mode .prose pre[class*="language-"] {
+            background: #0d0d0d !important;
+            border-color: var(--border-color) !important;
+            box-shadow: 8px 8px 0px 0px var(--border-color) !important;
+        }
+
+        .dark-mode .prose code:not([class*="language-"]) {
+            background: #064e3b !important;
+            color: var(--accent-color) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .dark-mode div.code-toolbar > .toolbar button {
+            background: var(--accent-color) !important;
+            color: #000 !important;
+            border-color: var(--border-color) !important;
+            box-shadow: 3px 3px 0px 0px #000 !important;
+        }
+
+        .dark-mode div.code-toolbar > .toolbar button:hover {
+            background: #064e3b !important;
+            color: var(--accent-color) !important;
+            box-shadow: 1px 1px 0px 0px #000 !important;
+        }
+
+        /* 移动端代码块字体大小优化 */
+        @media (max-width: 767px) {
+            .prose pre[class*="language-"] {
+                font-size: 0.85rem !important;
+                padding: 1rem !important;
+                box-shadow: 6px 6px 0px 0px #000 !important;
+            }
+
+            .prose code:not([class*="language-"]) {
+                font-size: 0.85em !important;
+            }
+
+            div.code-toolbar > .toolbar button {
+                font-size: 0.7rem !important;
+                padding: 0.3rem 0.6rem !important;
+            }
+
+            .dark-mode .prose pre[class*="language-"] {
+                box-shadow: 6px 6px 0px 0px var(--border-color) !important;
+            }
+        }
+
+        /* 超小屏幕优化 */
+        @media (max-width: 480px) {
+            .prose pre[class*="language-"] {
+                font-size: 0.8rem !important;
+                padding: 0.875rem !important;
             }
         }
         
