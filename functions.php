@@ -165,10 +165,16 @@ function parseCategoryPasswords() {
         $lines = explode("\n", $options->categoryPasswords);
         foreach ($lines as $line) {
             $line = trim($line);
-            if (empty($line) || strpos($line, ':') === false) {
+            // Skip empty lines
+            if (empty($line)) {
                 continue;
             }
-            list($slug, $password) = explode(':', $line, 2);
+            // Check that there's at least one colon
+            if (strpos($line, ':') === false) {
+                continue;
+            }
+            // Split on first colon only (allows password to contain colons)
+            [$slug, $password] = explode(':', $line, 2);
             $slug = trim($slug);
             $password = trim($password);
             if (!empty($slug) && !empty($password)) {
@@ -196,15 +202,18 @@ function getRequiredPassword($archive) {
             foreach ($archive->categories as $category) {
                 if (in_array($category['slug'], $protectedSlugs)) {
                     // 如果有分类独立密码，使用分类密码
-                    if (isset($categoryPasswords[$category['slug']])) {
+                    if (isset($categoryPasswords[$category['slug']]) && !empty($categoryPasswords[$category['slug']])) {
                         return $categoryPasswords[$category['slug']];
                     }
                     // 否则使用全站密码
                     if (!empty($options->postPassword)) {
                         return $options->postPassword;
                     }
-                    // 如果都没有，返回空字符串表示需要密码但未设置
-                    return '';
+                    // 如果都没有配置密码，使用一个安全的随机值（确保无法被猜测）
+                    // 使用站点特定盐值、分类slug和当前日期的组合，每天生成不同的哈希
+                    // 这样可以防止未配置密码时被绕过，同时给管理员提示需要配置密码
+                    $dateComponent = date('Y-m-d'); // 每天变化
+                    return hash('sha256', getBoldSecretSalt() . $category['slug'] . $dateComponent . 'no_password_configured');
                 }
             }
         }
@@ -314,7 +323,13 @@ function handlePasswordVerification($archive) {
         // CSRF 保护 - 验证来源
         $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
         $siteUrl = $options->siteUrl;
-        if (empty($referer) || strpos($referer, parse_url($siteUrl, PHP_URL_HOST)) === false) {
+        
+        // Extract hostname from both URLs for exact matching
+        $refererHost = !empty($referer) ? parse_url($referer, PHP_URL_HOST) : '';
+        $siteHost = parse_url($siteUrl, PHP_URL_HOST);
+        
+        // Strict hostname comparison - must match exactly
+        if (empty($refererHost) || $refererHost !== $siteHost) {
             return true; // 返回错误状态
         }
         
