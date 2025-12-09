@@ -197,13 +197,18 @@ function parseCategoryPasswords() {
 }
 
 /**
- * 获取文章所需的密码（优先分类独立密码，否则使用全站密码）
+ * 获取文章所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
  * @param object $archive 文章对象
  * @return string|null 返回需要的密码，如果不需要密码则返回null
  */
 function getRequiredPassword($archive) {
     $options = Helper::options();
     $categoryPasswords = parseCategoryPasswords();
+    
+    // 优先检查文章自定义字段中的密码（单篇文章密码）
+    if ($archive->is('single') && isset($archive->fields->password) && !empty($archive->fields->password)) {
+        return $archive->fields->password;
+    }
     
     // 检查分类密码保护
     if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
@@ -521,11 +526,126 @@ function parseReplyContent($content, $archive) {
 }
 
 /**
+ * 解析内联密码保护内容 {password:密码}内容{/password}
+ */
+function parseInlinePasswordContent($content, $archive) {
+    // 如果不是单页面或没有密码标签，直接返回
+    if (!$archive->is('single') || strpos($content, '{password:') === false) {
+        // 在列表页移除所有密码保护内容
+        return preg_replace("/{password:[^}]*}(.*?){\/password}/sm", '', $content);
+    }
+    
+    // 查找所有密码保护的内容块
+    preg_match_all("/{password:([^}]+)}(.*?){\/password}/sm", $content, $matches, PREG_SET_ORDER);
+    
+    if (empty($matches)) {
+        return $content;
+    }
+    
+    $user = Typecho_Widget::widget('Widget_User');
+    $lang = Helper::options()->languageSetting;
+    if (empty($lang)) $lang = 'en';
+    
+    foreach ($matches as $match) {
+        $fullMatch = $match[0];
+        $requiredPassword = trim($match[1]);
+        $protectedContent = $match[2];
+        
+        // 已登录用户且是文章作者，直接显示内容
+        if ($user->hasLogin() && $user->uid == $archive->authorId) {
+            $replacement = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                            <p class="font-bold text-green-700 dark:text-green-400 m-0">🔓 内容已解锁（作者）/ UNLOCKED (Author)</p>
+                        </div>' . $protectedContent;
+            $content = str_replace($fullMatch, $replacement, $content);
+            continue;
+        }
+        
+        // 生成内容块的唯一ID（基于密码和内容的哈希）
+        $blockId = substr(md5($requiredPassword . $protectedContent), 0, 8);
+        $cookieName = 'bold_inline_verified_' . $blockId;
+        
+        // 检查是否已验证
+        $verifiedHash = Typecho_Cookie::get($cookieName);
+        $isVerified = false;
+        
+        if (!empty($verifiedHash) && !empty($requiredPassword)) {
+            if (hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
+                $isVerified = true;
+            }
+        }
+        
+        // 处理密码提交
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inline_password_' . $blockId])) {
+            $inputPassword = isset($_POST['inline_password_' . $blockId]) ? strval($_POST['inline_password_' . $blockId]) : '';
+            
+            if (!empty($requiredPassword) && $inputPassword === $requiredPassword) {
+                $passwordHash = hash('sha256', $requiredPassword . getBoldSecretSalt());
+                Typecho_Cookie::set($cookieName, $passwordHash, time() + 604800);
+                $isVerified = true;
+            }
+        }
+        
+        if ($isVerified) {
+            // 显示已解锁的内容
+            $replacement = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                            <p class="font-bold text-green-700 dark:text-green-400 m-0">🔓 内容已解锁 / UNLOCKED</p>
+                        </div>' . $protectedContent;
+        } else {
+            // 显示密码输入表单
+            $errorMsg = '';
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inline_password_' . $blockId])) {
+                $errorMsg = $lang === 'cn' ? '密码错误，请重试' : 'Incorrect password, please try again';
+            }
+            
+            $placeholderText = $lang === 'cn' ? '输入密码解锁此内容...' : 'Enter password to unlock...';
+            $submitText = $lang === 'cn' ? '解锁' : 'UNLOCK';
+            
+            $replacement = '
+            <div class="inline-password-container my-6">
+                <div class="inline-password-inner flex flex-col items-center justify-center text-center p-6">
+                    <div class="text-4xl mb-3">🔐</div>
+                    <h4 class="text-lg font-black uppercase mb-3">' . ($lang === 'cn' ? '密码保护内容' : 'PASSWORD PROTECTED') . '</h4>';
+            
+            if (!empty($errorMsg)) {
+                $replacement .= '<div class="bg-red-100 border-2 border-red-500 text-red-700 px-3 py-2 mb-3 font-bold text-sm">' . $errorMsg . '</div>';
+            }
+            
+            $replacement .= '<form method="post" class="w-full max-w-xs">
+                        <input type="password" name="inline_password_' . $blockId . '" placeholder="' . $placeholderText . '" 
+                            class="w-full p-2 font-bold border-2 border-black focus:outline-none focus:border-pink-500 mb-3 text-center text-sm dark:bg-[#121212] dark:text-white dark:border-[#10b981]" required>
+                        <button type="submit" class="w-full bg-black text-white px-4 py-2 font-black text-sm uppercase tracking-wider hover:bg-pink-500 transition-colors border-2 border-black shadow-[2px_2px_0px_0px_#000] dark:bg-[#10b981] dark:text-black dark:border-[#10b981] dark:shadow-[2px_2px_0px_0px_#000]">
+                            ' . $submitText . '
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <style>
+                .inline-password-container {
+                    background: repeating-linear-gradient(45deg, #fef08a, #fef08a 15px, #000 15px, #000 30px);
+                    padding: 6px; border: 2px solid #000; box-shadow: 4px 4px 0px 0px #000;
+                }
+                .inline-password-inner { background: #fff; border: 2px solid #000; }
+                body.dark-mode .inline-password-container {
+                    background: repeating-linear-gradient(45deg, #064e3b, #064e3b 15px, #000 15px, #000 30px);
+                    border-color: #10b981; box-shadow: 4px 4px 0px 0px #10b981;
+                }
+                body.dark-mode .inline-password-inner { background: #121212; border-color: #10b981; color: #e5e5e5; }
+            </style>';
+        }
+        
+        $content = str_replace($fullMatch, $replacement, $content);
+    }
+    
+    return $content;
+}
+
+/**
  * 摘要输出
  */
 function printExcerpt($archive, $length = 140) {
     $content = $archive->content;
     $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
+    $content = preg_replace("/{password:[^}]*}(.*?){\/password}/sm", '', $content);
     $content = strip_tags($content);
     echo Typecho_Common::subStr($content, 0, $length, '...');
 }
