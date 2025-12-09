@@ -575,8 +575,15 @@ function parseInlinePasswordContent($content, $archive) {
             continue;
         }
         
-        // 生成内容块的唯一ID（基于密码和内容的哈希）
-        $blockId = substr(md5($requiredPassword . $protectedContent), 0, 8);
+        // 验证密码不为空（去除空白后）
+        if (empty($requiredPassword)) {
+            // 跳过空密码的块
+            continue;
+        }
+        
+        // 生成内容块的唯一ID（使用 SHA-256 而不是 MD5 以保持安全一致性）
+        $blockId = substr(hash('sha256', $requiredPassword . $protectedContent . getBoldSecretSalt()), 0, 12);
+        $blockId = sanitizeCategorySlugForCookie($blockId); // 确保Cookie名称安全
         $cookieName = 'bold_inline_verified_' . $blockId;
         
         // 检查是否已验证
