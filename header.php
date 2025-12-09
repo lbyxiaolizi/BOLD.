@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 强制浏览器使用网站指定的颜色方案，防止移动端系统黑暗模式与网站白天模式冲突 -->
+    <meta name="color-scheme" id="color-scheme-meta" content="light">
     
     <title><?php $this->archiveTitle(array(
             'category'  =>  _t('分类 %s 下的文章'),
@@ -96,6 +98,8 @@
         
         /* --- 核心变量定义 --- */
         :root {
+            /* 强制日间模式颜色方案，防止移动端系统黑暗模式干扰 */
+            color-scheme: light;
             /* 日间模式 (Light) */
             --bg-page: #f8f8f8;
             --bg-card: #ffffff;
@@ -113,6 +117,8 @@
 
         /* 暗黑模式 (Dark) - 统一使用 .dark-mode 类 */
         .dark-mode {
+            /* 暗黑模式颜色方案 */
+            color-scheme: dark;
             --bg-page: #121212;          /* 深灰黑背景 */
             --bg-card: #1e1e1e;          /* 卡片背景 */
             --text-main: #e5e5e5;        /* 主文字 */
@@ -582,12 +588,15 @@
     <script>
         function applyTheme() {
             const isDark = localStorage.getItem('darkMode') === 'true';
+            const colorSchemeMeta = document.getElementById('color-scheme-meta');
             if (isDark) {
                 document.documentElement.classList.add('dark-mode');
                 if (document.body) document.body.classList.add('dark-mode');
+                if (colorSchemeMeta) colorSchemeMeta.setAttribute('content', 'dark');
             } else {
                 document.documentElement.classList.remove('dark-mode');
                 if (document.body) document.body.classList.remove('dark-mode');
+                if (colorSchemeMeta) colorSchemeMeta.setAttribute('content', 'light');
             }
         }
         applyTheme();
