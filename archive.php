@@ -7,11 +7,8 @@ $passwordError = false;
 $needsPassword = false;
 
 if ($this->is('category')) {
-    // 检查是否需要为分类归档页面验证密码
-    if (requirePasswordForCategoryArchive()) {
-        $passwordError = handlePasswordVerification($this);
-        $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
-    }
+    $passwordError = handlePasswordVerification($this);
+    $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
 }
 
 $hoverColors = [

@@ -80,13 +80,6 @@ function themeConfig($form) {
         array('1' => _t('隐藏'), '0' => _t('显示')),
         '0', _t('加密分类文章在首页的显示'), _t('选择是否在首页隐藏属于加密分类的文章'));
     $form->addInput($hideProtectedCategoriesFromHome);
-    
-    // 分类归档页密码验证选项 - 控制是否需要密码才能访问加密分类的归档页面
-    // 默认值为'1'（是），表示需要密码验证才能查看分类归档页的文章列表
-    $requirePasswordForCategoryArchive = new Typecho_Widget_Helper_Form_Element_Radio('requirePasswordForCategoryArchive',
-        array('1' => _t('是'), '0' => _t('否')),
-        '1', _t('加密分类的归档界面是否需要密码验证'), _t('选择访问加密分类的归档页面时是否需要输入密码'));
-    $form->addInput($requirePasswordForCategoryArchive);
 }
 
 /**
@@ -284,23 +277,6 @@ function getProtectedCategorySlug($archive) {
     }
     
     return null;
-}
-
-/**
- * 检查文章是否仅通过分类加密（而非文章独立密码）
- * @param object $archive 文章对象
- * @return bool 如果文章仅通过分类加密返回true，否则返回false
- */
-function isOnlyCategoryEncrypted($archive) {
-    // 如果文章有独立密码字段，返回false（因为不是"仅"通过分类加密）
-    // 注意：在列表页中，fields属性可能不可用，所以需要检查属性是否存在
-    if (isset($archive->fields) && !empty($archive->fields->password)) {
-        return false;
-    }
-    
-    // 检查文章是否属于受保护的分类
-    $categorySlug = getProtectedCategorySlug($archive);
-    return $categorySlug !== null;
 }
 
 /**
@@ -715,55 +691,11 @@ function shouldHideFromHome($archive) {
 }
 
 /**
- * 检查分类归档页是否需要密码验证
- * 集中处理默认值逻辑，确保一致性
- * 
- * @return bool 如果需要密码验证返回true，否则返回false
- */
-function requirePasswordForCategoryArchive() {
-    $options = Helper::options();
-    // 默认值为'1'（需要密码），只有明确设置为'0'时才不需要密码
-    return !isset($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive != '0';
-}
-
-/**
- * 检查是否应该隐藏分类加密文章的摘要
- * 
- * 业务逻辑说明：
- * 1. 如果"隐藏加密分类文章在首页的显示"为开(1)，说明管理员不想在首页/列表页展示加密文章，此时应隐藏摘要
- * 2. 如果"加密分类的归档界面需要密码验证"为否(0)，说明分类归档页不需要密码，
- *    用户可以直接在归档页看到文章列表，此时在列表中隐藏摘要防止内容泄露
- * 3. 只有当两个条件都不满足时（首页显示 且 归档页需要密码），才显示密码保护提示
- * 
- * @return bool 如果应该隐藏摘要返回true，否则返回false
- */
-function shouldHideEncryptedExcerpt() {
-    $options = Helper::options();
-    
-    $hideFromHome = isset($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
-    $archivePasswordDisabled = !requirePasswordForCategoryArchive();
-    
-    return $hideFromHome || $archivePasswordDisabled;
-}
-
-/**
- * 摘要输出 - 如果文章属于加密分类且未验证密码，根据设置显示提示信息或隐藏摘要
+ * 摘要输出 - 如果文章属于加密分类且未验证密码，显示提示信息
  */
 function printExcerpt($archive, $length = 140) {
-    $options = Helper::options();
-    
     // 检查是否属于加密分类
     if (getProtectedCategorySlug($archive) !== null && !isPasswordVerified($archive)) {
-        // 如果文章仅通过分类加密（没有文章独立密码）
-        if (isOnlyCategoryEncrypted($archive)) {
-            // 根据设置决定是否隐藏摘要
-            if (shouldHideEncryptedExcerpt()) {
-                // 隐藏摘要，不显示任何内容
-                return;
-            }
-        }
-        
-        // 显示密码保护提示
         $lang = Helper::options()->languageSetting;
         if (empty($lang)) $lang = 'en';
         $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
