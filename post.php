@@ -3,7 +3,7 @@
 
 <?php
 // 处理密码验证
-$passwordError = handlePasswordVerification();
+$passwordError = handlePasswordVerification($this);
 $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
 ?>
 

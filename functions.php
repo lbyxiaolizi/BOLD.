@@ -72,6 +72,9 @@ function themeConfig($form) {
     
     $passwordProtectedCategories = new Typecho_Widget_Helper_Form_Element_Text('passwordProtectedCategories', NULL, NULL, _t('加密分类 (用英文逗号分隔)'), _t('输入需要密码保护的分类别名(slug)，多个用逗号分隔。例如: private,secret'));
     $form->addInput($passwordProtectedCategories);
+    
+    $categoryPasswords = new Typecho_Widget_Helper_Form_Element_Textarea('categoryPasswords', NULL, NULL, _t('分类独立密码设置'), _t('为不同的分类设置不同的密码。格式：分类slug:密码，每行一个。例如：<br>private:password123<br>secret:mySecret456<br>如果某分类未单独设置密码，将使用全站加密密码'));
+    $form->addInput($categoryPasswords);
 }
 
 /**
@@ -151,15 +154,40 @@ Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verif
  */
 
 /**
- * 检查文章是否需要密码保护
+ * 解析分类密码配置
+ * @return array 返回 分类slug => 密码 的映射数组
  */
-function isPasswordProtected($archive) {
+function parseCategoryPasswords() {
     $options = Helper::options();
+    $categoryPasswords = array();
     
-    // 检查全站密码
-    if (!empty($options->postPassword)) {
-        return true;
+    if (!empty($options->categoryPasswords)) {
+        $lines = explode("\n", $options->categoryPasswords);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line) || strpos($line, ':') === false) {
+                continue;
+            }
+            list($slug, $password) = explode(':', $line, 2);
+            $slug = trim($slug);
+            $password = trim($password);
+            if (!empty($slug) && !empty($password)) {
+                $categoryPasswords[$slug] = $password;
+            }
+        }
     }
+    
+    return $categoryPasswords;
+}
+
+/**
+ * 获取文章所需的密码（优先分类独立密码，否则使用全站密码）
+ * @param object $archive 文章对象
+ * @return string|null 返回需要的密码，如果不需要密码则返回null
+ */
+function getRequiredPassword($archive) {
+    $options = Helper::options();
+    $categoryPasswords = parseCategoryPasswords();
     
     // 检查分类密码保护
     if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
@@ -167,13 +195,56 @@ function isPasswordProtected($archive) {
         if (!empty($archive->categories)) {
             foreach ($archive->categories as $category) {
                 if (in_array($category['slug'], $protectedSlugs)) {
-                    return true;
+                    // 如果有分类独立密码，使用分类密码
+                    if (isset($categoryPasswords[$category['slug']])) {
+                        return $categoryPasswords[$category['slug']];
+                    }
+                    // 否则使用全站密码
+                    if (!empty($options->postPassword)) {
+                        return $options->postPassword;
+                    }
+                    // 如果都没有，返回空字符串表示需要密码但未设置
+                    return '';
                 }
             }
         }
     }
     
-    return false;
+    // 检查全站密码
+    if (!empty($options->postPassword)) {
+        return $options->postPassword;
+    }
+    
+    return null;
+}
+
+/**
+ * 获取文章所属的受保护分类slug
+ * @param object $archive 文章对象
+ * @return string|null 返回受保护的分类slug，如果没有则返回null
+ */
+function getProtectedCategorySlug($archive) {
+    $options = Helper::options();
+    
+    if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
+        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+        if (!empty($archive->categories)) {
+            foreach ($archive->categories as $category) {
+                if (in_array($category['slug'], $protectedSlugs)) {
+                    return $category['slug'];
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * 检查文章是否需要密码保护
+ */
+function isPasswordProtected($archive) {
+    return getRequiredPassword($archive) !== null;
 }
 
 /**
@@ -188,12 +259,31 @@ function isPasswordVerified($archive) {
         return true;
     }
     
-    // 检查 Cookie 中的密码验证状态
+    $requiredPassword = getRequiredPassword($archive);
+    if ($requiredPassword === null) {
+        return true; // 不需要密码
+    }
+    
+    // 获取受保护的分类slug（如果是分类保护）
+    $categorySlug = getProtectedCategorySlug($archive);
+    
+    // 如果是分类密码保护，检查分类特定的Cookie
+    if ($categorySlug !== null) {
+        $cookieName = 'bold_category_verified_' . $categorySlug;
+        $verifiedHash = Typecho_Cookie::get($cookieName);
+        if (!empty($verifiedHash)) {
+            // 验证分类特定密码的哈希
+            if (hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
+                return true;
+            }
+        }
+    }
+    
+    // 检查全站密码验证
     $verifiedHash = Typecho_Cookie::get('bold_password_verified');
     if (!empty($verifiedHash)) {
-        $password = $options->postPassword;
         // 使用更安全的哈希比较
-        if (!empty($password) && hash_equals(hash('sha256', $password . getBoldSecretSalt()), $verifiedHash)) {
+        if (!empty($requiredPassword) && hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
             return true;
         }
     }
@@ -212,12 +302,14 @@ function getBoldSecretSalt() {
 /**
  * 处理密码验证请求
  */
-function handlePasswordVerification() {
+function handlePasswordVerification($archive) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bold_password'])) {
         $options = Helper::options();
         // 输入清理
         $inputPassword = isset($_POST['bold_password']) ? strval($_POST['bold_password']) : '';
-        $correctPassword = $options->postPassword;
+        
+        // 获取当前文章需要的正确密码
+        $correctPassword = getRequiredPassword($archive);
         
         // CSRF 保护 - 验证来源
         $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
@@ -227,8 +319,20 @@ function handlePasswordVerification() {
         }
         
         if (!empty($correctPassword) && $inputPassword === $correctPassword) {
+            // 获取分类slug（如果是分类保护）
+            $categorySlug = getProtectedCategorySlug($archive);
+            
             // 使用更安全的哈希，设置验证 Cookie (有效期 7 天)
-            Typecho_Cookie::set('bold_password_verified', hash('sha256', $correctPassword . getBoldSecretSalt()), time() + 604800);
+            $passwordHash = hash('sha256', $correctPassword . getBoldSecretSalt());
+            
+            if ($categorySlug !== null) {
+                // 设置分类特定的Cookie
+                $cookieName = 'bold_category_verified_' . $categorySlug;
+                Typecho_Cookie::set($cookieName, $passwordHash, time() + 604800);
+            } else {
+                // 设置全站密码Cookie
+                Typecho_Cookie::set('bold_password_verified', $passwordHash, time() + 604800);
+            }
             
             // 安全重定向 - 仅使用路径部分
             $redirectPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -250,9 +354,30 @@ function renderPasswordForm($archive, $hasError = false) {
     $lang = Helper::options()->languageSetting;
     if (empty($lang)) $lang = 'en';
     
+    // 获取受保护的分类信息
+    $categorySlug = getProtectedCategorySlug($archive);
+    $categoryName = null;
+    if ($categorySlug && !empty($archive->categories)) {
+        foreach ($archive->categories as $category) {
+            if ($category['slug'] === $categorySlug) {
+                $categoryName = $category['name'];
+                break;
+            }
+        }
+    }
+    
+    // 根据是否有分类信息调整描述文本
+    if ($categoryName) {
+        $desc = $lang === 'cn' 
+            ? "此内容属于加密分类「{$categoryName}」，请输入分类密码查看。" 
+            : "This content belongs to the encrypted category \"{$categoryName}\". Please enter the category password to view.";
+    } else {
+        $desc = $lang === 'cn' ? '此内容受密码保护，请输入密码查看。' : 'This content is password protected. Please enter the password to view.';
+    }
+    
     $texts = array(
         'title' => $lang === 'cn' ? '需要密码' : 'PASSWORD REQUIRED',
-        'desc' => $lang === 'cn' ? '此内容受密码保护，请输入密码查看。' : 'This content is password protected. Please enter the password to view.',
+        'desc' => $desc,
         'placeholder' => $lang === 'cn' ? '请输入密码...' : 'Enter password...',
         'submit' => $lang === 'cn' ? '解锁' : 'UNLOCK',
         'error' => $lang === 'cn' ? '密码错误，请重试' : 'Incorrect password, please try again',
