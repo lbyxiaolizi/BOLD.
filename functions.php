@@ -728,10 +728,10 @@ function printExcerpt($archive, $length = 140) {
         if (isOnlyCategoryEncrypted($archive)) {
             // 根据设置决定是否隐藏摘要
             // 条件：如果"隐藏加密分类文章在首页的显示"为开(1) 或 "加密分类的归档界面需要密码验证"为否(0)，则隐藏摘要
-            $hideFromHome = !empty($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
-            $requireArchivePassword = empty($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive == '0';
+            $hideFromHome = isset($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
+            $archivePasswordDisabled = isset($options->requirePasswordForCategoryArchive) && $options->requirePasswordForCategoryArchive == '0';
             
-            if ($hideFromHome || $requireArchivePassword) {
+            if ($hideFromHome || $archivePasswordDisabled) {
                 // 隐藏摘要，不显示任何内容
                 return;
             }

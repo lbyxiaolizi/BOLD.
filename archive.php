@@ -9,7 +9,8 @@ $needsPassword = false;
 if ($this->is('category')) {
     $options = Helper::options();
     // 检查是否需要为分类归档页面验证密码
-    $requireArchivePassword = empty($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive == '1';
+    // 默认值为'1'（需要密码），只有明确设置为'0'时才不需要密码
+    $requireArchivePassword = !isset($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive != '0';
     
     if ($requireArchivePassword) {
         $passwordError = handlePasswordVerification($this);
