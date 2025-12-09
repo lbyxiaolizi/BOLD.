@@ -294,7 +294,7 @@ function getProtectedCategorySlug($archive) {
 function isOnlyCategoryEncrypted($archive) {
     // 如果文章有独立密码字段，返回false（因为不是"仅"通过分类加密）
     // 注意：在列表页中，fields属性可能不可用，所以需要检查属性是否存在
-    if (isset($archive->fields) && isset($archive->fields->password) && !empty($archive->fields->password)) {
+    if (isset($archive->fields) && !empty($archive->fields->password)) {
         return false;
     }
     
@@ -715,16 +715,33 @@ function shouldHideFromHome($archive) {
 }
 
 /**
+ * 检查分类归档页是否需要密码验证
+ * 集中处理默认值逻辑，确保一致性
+ * 
+ * @return bool 如果需要密码验证返回true，否则返回false
+ */
+function requirePasswordForCategoryArchive() {
+    $options = Helper::options();
+    // 默认值为'1'（需要密码），只有明确设置为'0'时才不需要密码
+    return !isset($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive != '0';
+}
+
+/**
  * 检查是否应该隐藏分类加密文章的摘要
- * 根据主题设置判断是否应该隐藏仅通过分类加密的文章摘要
+ * 
+ * 业务逻辑说明：
+ * 1. 如果"隐藏加密分类文章在首页的显示"为开(1)，说明管理员不想在首页/列表页展示加密文章，此时应隐藏摘要
+ * 2. 如果"加密分类的归档界面需要密码验证"为否(0)，说明分类归档页不需要密码，
+ *    用户可以直接在归档页看到文章列表，此时在列表中隐藏摘要防止内容泄露
+ * 3. 只有当两个条件都不满足时（首页显示 且 归档页需要密码），才显示密码保护提示
+ * 
  * @return bool 如果应该隐藏摘要返回true，否则返回false
  */
 function shouldHideEncryptedExcerpt() {
     $options = Helper::options();
     
-    // 条件：如果"隐藏加密分类文章在首页的显示"为开(1) 或 "加密分类的归档界面需要密码验证"为否(0)，则隐藏摘要
     $hideFromHome = isset($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
-    $archivePasswordDisabled = isset($options->requirePasswordForCategoryArchive) && $options->requirePasswordForCategoryArchive == '0';
+    $archivePasswordDisabled = !requirePasswordForCategoryArchive();
     
     return $hideFromHome || $archivePasswordDisabled;
 }
