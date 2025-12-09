@@ -82,6 +82,7 @@
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.18.2/tocbot.css">
     
@@ -328,63 +329,148 @@
             box-shadow: 1px 1px 0px 0px #000 !important;
         }
 
-        /* 代码高亮颜色优化 (基于 Okaidia 主题) */
+        /* 代码高亮颜色优化 - 增强版 (Enhanced Syntax Highlighting) */
+        
+        /* 注释 - 灰蓝色 */
         .token.comment,
         .token.prolog,
         .token.doctype,
         .token.cdata {
-            color: #8292a2 !important;
+            color: #7c8a99 !important;
+            font-style: italic !important;
         }
 
+        /* 标点符号 - 浅白色 */
         .token.punctuation {
-            color: #f8f8f2 !important;
+            color: #d4d4d4 !important;
         }
 
+        /* 命名空间 - 半透明 */
+        .token.namespace {
+            opacity: 0.7 !important;
+        }
+
+        /* 标签、属性、常量 - 粉红色 */
         .token.property,
         .token.tag,
         .token.constant,
         .token.symbol,
         .token.deleted {
-            color: #f92672 !important;
+            color: #ff6b9d !important;
+            font-weight: 600 !important;
         }
 
+        /* 布尔值、数字 - 紫色 */
         .token.boolean,
         .token.number {
-            color: #ae81ff !important;
+            color: #bd93f9 !important;
+            font-weight: 600 !important;
         }
 
+        /* 选择器、属性名、字符串 - 亮绿色 */
         .token.selector,
         .token.attr-name,
         .token.string,
         .token.char,
         .token.builtin,
         .token.inserted {
-            color: #a6e22e !important;
+            color: #50fa7b !important;
         }
 
+        /* 运算符、实体、URL - 青色 */
         .token.operator,
         .token.entity,
         .token.url,
         .language-css .token.string,
         .style .token.string,
         .token.variable {
-            color: #f8f8f2 !important;
+            color: #8be9fd !important;
         }
 
+        /* @规则、属性值、函数、类名 - 黄色 */
         .token.atrule,
         .token.attr-value,
         .token.function,
         .token.class-name {
-            color: #e6db74 !important;
+            color: #f1fa8c !important;
+            font-weight: 600 !important;
         }
 
+        /* 关键字 - 亮青色 */
         .token.keyword {
-            color: #66d9ef !important;
+            color: #8be9fd !important;
+            font-weight: 700 !important;
         }
 
+        /* 正则表达式、重要标记 - 橙色 */
         .token.regex,
         .token.important {
-            color: #fd971f !important;
+            color: #ffb86c !important;
+            font-weight: 600 !important;
+        }
+
+        /* 粗体 */
+        .token.important,
+        .token.bold {
+            font-weight: 700 !important;
+        }
+
+        /* 斜体 */
+        .token.italic {
+            font-style: italic !important;
+        }
+
+        /* 实体 */
+        .token.entity {
+            cursor: help !important;
+        }
+
+        /* Python/Ruby 特定 - 装饰器 */
+        .token.decorator,
+        .token.annotation {
+            color: #ff79c6 !important;
+        }
+
+        /* HTML/XML 属性值 */
+        .token.attr-value > .token.punctuation {
+            color: #50fa7b !important;
+        }
+
+        /* JavaScript/TypeScript 特定 */
+        .language-javascript .token.keyword,
+        .language-typescript .token.keyword {
+            color: #ff79c6 !important;
+        }
+
+        /* CSS 选择器增强 */
+        .language-css .token.selector {
+            color: #50fa7b !important;
+        }
+
+        /* CSS 属性 */
+        .language-css .token.property {
+            color: #8be9fd !important;
+        }
+
+        /* 行号样式 - 粗野风格 */
+        .line-numbers .line-numbers-rows {
+            border-right: 3px solid #333 !important;
+            background: #1a1a1a !important;
+            padding-right: 0.5em !important;
+        }
+
+        .line-numbers-rows > span:before {
+            color: #666 !important;
+            font-weight: 600 !important;
+        }
+
+        .dark-mode .line-numbers .line-numbers-rows {
+            border-right-color: var(--border-color) !important;
+            background: #000 !important;
+        }
+
+        .dark-mode .line-numbers-rows > span:before {
+            color: #10b981 !important;
         }
 
         /* 暗黑模式代码块适配 */
