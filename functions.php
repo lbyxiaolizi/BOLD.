@@ -75,6 +75,11 @@ function themeConfig($form) {
     
     $categoryPasswords = new Typecho_Widget_Helper_Form_Element_Textarea('categoryPasswords', NULL, NULL, _t('分类独立密码设置'), _t('为不同的分类设置不同的密码。格式：分类slug:密码，每行一个。例如：<br>private:password123<br>secret:mySecret456<br>如果某分类未单独设置密码，将使用全站加密密码'));
     $form->addInput($categoryPasswords);
+    
+    $hideProtectedCategoriesFromHome = new Typecho_Widget_Helper_Form_Element_Radio('hideProtectedCategoriesFromHome',
+        array('1' => _t('隐藏'), '0' => _t('显示')),
+        '0', _t('加密分类文章在首页的显示'), _t('选择是否在首页隐藏属于加密分类的文章'));
+    $form->addInput($hideProtectedCategoriesFromHome);
 }
 
 /**
@@ -197,8 +202,8 @@ function parseCategoryPasswords() {
 }
 
 /**
- * 获取文章所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
- * @param object $archive 文章对象
+ * 获取文章/分类所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
+ * @param object $archive 文章/分类对象
  * @return string|null 返回需要的密码，如果不需要密码则返回null
  */
 function getRequiredPassword($archive) {
@@ -210,28 +215,23 @@ function getRequiredPassword($archive) {
         return $archive->fields->password;
     }
     
-    // 检查分类密码保护
-    if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
-        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
-        if (!empty($archive->categories)) {
-            foreach ($archive->categories as $category) {
-                if (in_array($category['slug'], $protectedSlugs)) {
-                    // 如果有分类独立密码，使用分类密码
-                    if (isset($categoryPasswords[$category['slug']]) && !empty($categoryPasswords[$category['slug']])) {
-                        return $categoryPasswords[$category['slug']];
-                    }
-                    // 否则使用全站密码
-                    if (!empty($options->postPassword)) {
-                        return $options->postPassword;
-                    }
-                    // 如果都没有配置密码，使用一个安全的随机值（确保无法被猜测）
-                    // 使用站点特定盐值、分类slug和当前日期的组合，每天生成不同的哈希
-                    // 这样可以防止未配置密码时被绕过，同时给管理员提示需要配置密码
-                    $dateComponent = date('Y-m-d'); // 每天变化
-                    return hash('sha256', getBoldSecretSalt() . $category['slug'] . $dateComponent . 'no_password_configured');
-                }
-            }
+    // 获取受保护的分类slug（支持文章页和分类页）
+    $categorySlug = getProtectedCategorySlug($archive);
+    
+    if ($categorySlug !== null) {
+        // 如果有分类独立密码，使用分类密码
+        if (isset($categoryPasswords[$categorySlug]) && !empty($categoryPasswords[$categorySlug])) {
+            return $categoryPasswords[$categorySlug];
         }
+        // 否则使用全站密码
+        if (!empty($options->postPassword)) {
+            return $options->postPassword;
+        }
+        // 如果都没有配置密码，使用一个安全的随机值（确保无法被猜测）
+        // 使用站点特定盐值、分类slug和当前日期的组合，每天生成不同的哈希
+        // 这样可以防止未配置密码时被绕过，同时给管理员提示需要配置密码
+        $dateComponent = date('Y-m-d'); // 每天变化
+        return hash('sha256', getBoldSecretSalt() . $categorySlug . $dateComponent . 'no_password_configured');
     }
     
     // 检查全站密码
@@ -243,15 +243,30 @@ function getRequiredPassword($archive) {
 }
 
 /**
- * 获取文章所属的受保护分类slug
- * @param object $archive 文章对象
+ * 获取文章所属的受保护分类slug（支持文章页和分类页）
+ * @param object $archive 文章/分类对象
  * @return string|null 返回受保护的分类slug，如果没有则返回null
  */
 function getProtectedCategorySlug($archive) {
     $options = Helper::options();
     
-    if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
-        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    if (empty($options->passwordProtectedCategories)) {
+        return null;
+    }
+    
+    $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    
+    // 如果是分类页面，检查当前分类是否需要密码保护
+    if ($archive->is('category')) {
+        $currentSlug = $archive->slug;
+        if (in_array($currentSlug, $protectedSlugs)) {
+            return $currentSlug;
+        }
+        return null;
+    }
+    
+    // 如果是单篇文章页面，检查文章所属分类
+    if ($archive->is('single')) {
         if (!empty($archive->categories)) {
             foreach ($archive->categories as $category) {
                 if (in_array($category['slug'], $protectedSlugs)) {
@@ -640,9 +655,47 @@ function parseInlinePasswordContent($content, $archive) {
 }
 
 /**
- * 摘要输出
+ * 检查文章是否应该从首页隐藏（属于加密分类且设置了隐藏）
+ * @param object $archive 文章对象
+ * @return bool 返回true表示应该隐藏
+ */
+function shouldHideFromHome($archive) {
+    $options = Helper::options();
+    
+    // 如果未启用隐藏功能，返回false
+    if (empty($options->hideProtectedCategoriesFromHome) || $options->hideProtectedCategoriesFromHome == '0') {
+        return false;
+    }
+    
+    // 检查文章是否属于加密分类
+    if (empty($options->passwordProtectedCategories) || empty($archive->categories)) {
+        return false;
+    }
+    
+    $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    
+    foreach ($archive->categories as $category) {
+        if (in_array($category['slug'], $protectedSlugs)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * 摘要输出 - 如果文章属于加密分类且未验证密码，显示提示信息
  */
 function printExcerpt($archive, $length = 140) {
+    // 检查是否属于加密分类
+    if (getProtectedCategorySlug($archive) !== null && !isPasswordVerified($archive)) {
+        $lang = Helper::options()->languageSetting;
+        if (empty($lang)) $lang = 'en';
+        $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
+        echo $text;
+        return;
+    }
+    
     $content = $archive->content;
     $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
     $content = preg_replace("/{password:[^}]*}(.*?){\/password}/sm", '', $content);

@@ -2,6 +2,15 @@
 <?php $this->need('header.php'); ?>
 
 <?php
+// 处理分类页密码验证
+$passwordError = false;
+$needsPassword = false;
+
+if ($this->is('category')) {
+    $passwordError = handlePasswordVerification($this);
+    $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
+}
+
 $hoverColors = [
     'hover:bg-red-200', 'hover:bg-orange-200', 'hover:bg-amber-200',
     'hover:bg-yellow-200', 'hover:bg-lime-200', 'hover:bg-green-200',
@@ -26,6 +35,12 @@ $hoverColors = [
         </h1>
     </div>
 
+    <?php if ($needsPassword): ?>
+    <!-- 分类密码保护 -->
+    <div class="p-6 md:p-10">
+        <?php renderPasswordForm($this, $passwordError); ?>
+    </div>
+    <?php else: ?>
     <div class="flex-grow">
         <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
@@ -53,6 +68,7 @@ $hoverColors = [
         <?php $this->pageLink('← 上一页', 'prev'); ?>
         <?php $this->pageLink('下一页 →', 'next'); ?>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php $this->need('sidebar.php'); ?>

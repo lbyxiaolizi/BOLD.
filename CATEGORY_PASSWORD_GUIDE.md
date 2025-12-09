@@ -40,6 +40,17 @@
    - 如果某个加密分类没有设置独立密码，将使用这个全局密码
    - 如果您想让所有加密分类使用相同密码，只需设置全站密码即可
 
+5. **设置加密分类在首页的显示**
+   - 在"加密分类文章在首页的显示"选项中，选择"隐藏"或"显示"
+   - 选择"隐藏"：加密分类的文章不会出现在首页列表中
+   - 选择"显示"（默认）：加密分类的文章会在首页显示，但摘要会显示提示信息
+
+#### 分类页密码保护
+
+- 访问加密分类的归档页面（例如 `/category/private`）时也需要输入密码
+- 输入正确密码后才能查看该分类下的文章列表
+- 密码验证状态与文章页共享（同一个分类，验证一次即可）
+
 ### 二、单篇文章密码保护
 
 #### 使用方法
@@ -181,6 +192,17 @@ Visitors can access encrypted content after entering the correct password. Passw
    - In the "Global Encryption Password" field, set a global password
    - If an encrypted category doesn't have a specific password, it will use this global password
    - If you want all encrypted categories to use the same password, just set the global password
+
+5. **Set Homepage Display for Encrypted Categories**
+   - In "Encrypted category articles on homepage display" option, select "Hide" or "Show"
+   - Select "Hide": Articles from encrypted categories won't appear on the homepage list
+   - Select "Show" (default): Articles from encrypted categories will appear on homepage, but excerpt shows a protection notice
+
+#### Category Page Password Protection
+
+- Accessing an encrypted category's archive page (e.g., `/category/private`) also requires password
+- Must enter the correct password to view the article list in that category
+- Password verification status is shared with article pages (verify once for the same category)
 
 ### 2. Individual Article Password Protection
 
