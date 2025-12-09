@@ -50,6 +50,28 @@ function themeConfig($form) {
 
     $turnstileSecretKey = new Typecho_Widget_Helper_Form_Element_Text('turnstileSecretKey', NULL, NULL, _t('Turnstile Secret Key'), _t('Cloudflare Turnstile 密钥，留空则不启用'));
     $form->addInput($turnstileSecretKey);
+    
+    // 6. 侧边栏作者名称
+    $sidebarAuthorName = new Typecho_Widget_Helper_Form_Element_Text('sidebarAuthorName', NULL, NULL, _t('侧边栏作者名称'), _t('显示在侧边栏个人卡片中的名称'));
+    $form->addInput($sidebarAuthorName);
+    
+    // 7. 打赏功能设置
+    $wechatQrUrl = new Typecho_Widget_Helper_Form_Element_Text('wechatQrUrl', NULL, NULL, _t('微信收款码 URL'), _t('微信打赏二维码图片地址，留空则显示占位符'));
+    $form->addInput($wechatQrUrl);
+    
+    $alipayQrUrl = new Typecho_Widget_Helper_Form_Element_Text('alipayQrUrl', NULL, NULL, _t('支付宝收款码 URL'), _t('支付宝打赏二维码图片地址，留空则显示占位符'));
+    $form->addInput($alipayQrUrl);
+    
+    // 8. 默认封面图
+    $defaultOgImage = new Typecho_Widget_Helper_Form_Element_Text('defaultOgImage', NULL, NULL, _t('默认封面图 URL'), _t('当文章没有图片时使用的默认社交分享封面图'));
+    $form->addInput($defaultOgImage);
+    
+    // 9. 文章/分类密码保护
+    $postPassword = new Typecho_Widget_Helper_Form_Element_Text('postPassword', NULL, NULL, _t('全站加密密码'), _t('设置后，访客需要输入密码才能查看所有文章内容。留空则不启用'));
+    $form->addInput($postPassword);
+    
+    $passwordProtectedCategories = new Typecho_Widget_Helper_Form_Element_Text('passwordProtectedCategories', NULL, NULL, _t('加密分类 (用英文逗号分隔)'), _t('输入需要密码保护的分类别名(slug)，多个用逗号分隔。例如: private,secret'));
+    $form->addInput($passwordProtectedCategories);
 }
 
 /**
@@ -70,6 +92,11 @@ function get_theme_text($key, $archive) {
         'related_posts' => array('en' => 'YOU MAY ALSO LIKE', 'cn' => '相关推荐'),
         'timeline_title' => array('en' => 'TIMELINE <span class="text-white">ARCHIVE</span>', 'cn' => '时间轴 <span class="text-white">归档</span>'),
         'links_title' => array('en' => 'FRIENDS <span class="text-white">LINKS</span>', 'cn' => '友情 <span class="text-white">链接</span>'),
+        'password_required' => array('en' => 'PASSWORD REQUIRED', 'cn' => '需要密码'),
+        'password_placeholder' => array('en' => 'Enter password...', 'cn' => '请输入密码...'),
+        'password_submit' => array('en' => 'UNLOCK', 'cn' => '解锁'),
+        'password_error' => array('en' => 'Incorrect password', 'cn' => '密码错误'),
+        'password_protected_content' => array('en' => 'This content is password protected.', 'cn' => '此内容受密码保护。'),
     );
 
     return isset($texts[$key][$lang]) ? $texts[$key][$lang] : '';
@@ -118,6 +145,155 @@ class ThemeHooks {
     }
 }
 Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verifyTurnstile');
+
+/**
+ * 密码保护功能
+ */
+
+/**
+ * 检查文章是否需要密码保护
+ */
+function isPasswordProtected($archive) {
+    $options = Helper::options();
+    
+    // 检查全站密码
+    if (!empty($options->postPassword)) {
+        return true;
+    }
+    
+    // 检查分类密码保护
+    if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
+        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+        if (!empty($archive->categories)) {
+            foreach ($archive->categories as $category) {
+                if (in_array($category['slug'], $protectedSlugs)) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * 检查密码是否已验证
+ */
+function isPasswordVerified($archive) {
+    $options = Helper::options();
+    
+    // 已登录用户直接通过
+    $user = Typecho_Widget::widget('Widget_User');
+    if ($user->hasLogin()) {
+        return true;
+    }
+    
+    // 检查 Cookie 中的密码验证状态
+    $verifiedHash = Typecho_Cookie::get('bold_password_verified');
+    if (!empty($verifiedHash)) {
+        $password = $options->postPassword;
+        // 使用更安全的哈希比较
+        if (!empty($password) && hash_equals(hash('sha256', $password . getBoldSecretSalt()), $verifiedHash)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * 获取安全盐值 (基于站点URL生成唯一盐)
+ */
+function getBoldSecretSalt() {
+    $options = Helper::options();
+    return hash('sha256', $options->siteUrl . 'bold_theme_salt');
+}
+
+/**
+ * 处理密码验证请求
+ */
+function handlePasswordVerification() {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bold_password'])) {
+        $options = Helper::options();
+        // 输入清理
+        $inputPassword = isset($_POST['bold_password']) ? strval($_POST['bold_password']) : '';
+        $correctPassword = $options->postPassword;
+        
+        // CSRF 保护 - 验证来源
+        $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+        $siteUrl = $options->siteUrl;
+        if (empty($referer) || strpos($referer, parse_url($siteUrl, PHP_URL_HOST)) === false) {
+            return true; // 返回错误状态
+        }
+        
+        if (!empty($correctPassword) && $inputPassword === $correctPassword) {
+            // 使用更安全的哈希，设置验证 Cookie (有效期 7 天)
+            Typecho_Cookie::set('bold_password_verified', hash('sha256', $correctPassword . getBoldSecretSalt()), time() + 604800);
+            
+            // 安全重定向 - 仅使用路径部分
+            $redirectPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+            $query = parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY);
+            $safeUri = $redirectPath . ($query ? '?' . $query : '');
+            header('Location: ' . $safeUri);
+            exit;
+        } else {
+            return true; // 返回错误状态
+        }
+    }
+    return false;
+}
+
+/**
+ * 输出密码保护表单
+ */
+function renderPasswordForm($archive, $hasError = false) {
+    $lang = Helper::options()->languageSetting;
+    if (empty($lang)) $lang = 'en';
+    
+    $texts = array(
+        'title' => $lang === 'cn' ? '需要密码' : 'PASSWORD REQUIRED',
+        'desc' => $lang === 'cn' ? '此内容受密码保护，请输入密码查看。' : 'This content is password protected. Please enter the password to view.',
+        'placeholder' => $lang === 'cn' ? '请输入密码...' : 'Enter password...',
+        'submit' => $lang === 'cn' ? '解锁' : 'UNLOCK',
+        'error' => $lang === 'cn' ? '密码错误，请重试' : 'Incorrect password, please try again',
+    );
+    
+    ?>
+    <div class="password-form-container my-8">
+        <div class="password-form-inner flex flex-col items-center justify-center text-center p-6 md:p-10">
+            <div class="text-6xl mb-4">🔐</div>
+            <h3 class="text-2xl font-black uppercase mb-2"><?php echo $texts['title']; ?></h3>
+            <p class="font-bold mb-6 max-w-md"><?php echo $texts['desc']; ?></p>
+            
+            <?php if ($hasError): ?>
+            <div class="bg-red-100 border-2 border-red-500 text-red-700 px-4 py-2 mb-4 font-bold">
+                <?php echo $texts['error']; ?>
+            </div>
+            <?php endif; ?>
+            
+            <form method="post" class="w-full max-w-sm">
+                <input type="password" name="bold_password" placeholder="<?php echo $texts['placeholder']; ?>" 
+                    class="w-full p-3 font-bold border-4 border-black focus:outline-none focus:border-pink-500 mb-4 text-center dark:bg-[#121212] dark:text-white dark:border-[#10b981]" required>
+                <button type="submit" class="w-full bg-black text-white px-8 py-3 font-black text-lg uppercase tracking-widest hover:bg-pink-500 transition-colors border-4 border-black shadow-[4px_4px_0px_0px_#000] dark:bg-[#10b981] dark:text-black dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#000]">
+                    <?php echo $texts['submit']; ?>
+                </button>
+            </form>
+        </div>
+    </div>
+    <style>
+        .password-form-container {
+            background: repeating-linear-gradient(45deg, #fef08a, #fef08a 20px, #000 20px, #000 40px);
+            padding: 10px; border: 4px solid #000; box-shadow: 8px 8px 0px 0px #000;
+        }
+        .password-form-inner { background: #fff; border: 4px solid #000; }
+        body.dark-mode .password-form-container {
+            background: repeating-linear-gradient(45deg, #064e3b, #064e3b 20px, #000 20px, #000 40px);
+            border-color: #10b981; box-shadow: 8px 8px 0px 0px #10b981;
+        }
+        body.dark-mode .password-form-inner { background: #121212; border-color: #10b981; color: #e5e5e5; }
+    </style>
+    <?php
+}
 
 /**
  * 核心逻辑：评论可见
@@ -493,7 +669,8 @@ function get_seo_description($archive) {
  * SEO: 封面图
  */
 function get_og_image($archive) {
-    $default_img = 'https://cdn.tailwindcss.com/img/card-top.jpg'; 
+    $options = Helper::options();
+    $default_img = !empty($options->defaultOgImage) ? $options->defaultOgImage : 'https://cdn.tailwindcss.com/img/card-top.jpg'; 
     if (($archive->is('post') || $archive->is('page'))) {
         $content = '';
         if (isset($archive->content) && is_string($archive->content)) { $content = $archive->content; }
