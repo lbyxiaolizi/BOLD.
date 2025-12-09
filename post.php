@@ -1,6 +1,12 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <?php $this->need('header.php'); ?>
 
+<?php
+// 处理密码验证
+$passwordError = handlePasswordVerification();
+$needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
+?>
+
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black bg-white flex flex-col dark:border-[#10b981] dark:bg-[#121212]">
     <article class="flex-grow">
         <header class="p-6 md:p-10 border-b-4 border-black bg-yellow-50 relative overflow-hidden dark:border-[#10b981] dark:bg-[#262626]">
@@ -31,6 +37,13 @@
             </div>
         </header>
 
+        <?php if ($needsPassword): ?>
+        <!-- 密码保护内容 -->
+        <div class="p-6 md:p-10">
+            <?php renderPasswordForm($this, $passwordError); ?>
+        </div>
+        <?php else: ?>
+        <!-- 正常内容 -->
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none prose-strong:font-black prose-strong:bg-pink-200 prose-strong:px-1 dark:prose-invert">
             <?php echo parseReplyContent($this->content, $this); ?>
         </div>
@@ -58,15 +71,23 @@
                 <h3 class="text-2xl font-black uppercase mb-6 dark:text-white">THANK YOU!</h3>
                 <div class="grid grid-cols-2 gap-4 mb-6">
                     <div class="text-center">
+                        <?php if ($this->options->wechatQrUrl): ?>
+                        <img src="<?php $this->options->wechatQrUrl(); ?>" alt="WeChat QR" class="w-full aspect-square object-contain bg-gray-200 mb-2 dark:bg-[#1e1e1e]">
+                        <?php else: ?>
                         <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
                             [微信二维码]
                         </div>
+                        <?php endif; ?>
                         <span class="font-bold text-sm dark:text-gray-300">WeChat</span>
                     </div>
                     <div class="text-center">
+                        <?php if ($this->options->alipayQrUrl): ?>
+                        <img src="<?php $this->options->alipayQrUrl(); ?>" alt="Alipay QR" class="w-full aspect-square object-contain bg-gray-200 mb-2 dark:bg-[#1e1e1e]">
+                        <?php else: ?>
                         <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
                             [支付宝二维码]
                         </div>
+                        <?php endif; ?>
                         <span class="font-bold text-sm dark:text-gray-300">Alipay</span>
                     </div>
                 </div>
@@ -91,9 +112,12 @@
                 </ul>
             </div>
         </div>
+        <?php endif; ?>
     </article>
 
+    <?php if (!$needsPassword): ?>
     <?php $this->need('comments.php'); ?>
+    <?php endif; ?>
 </div>
 
 <?php $this->need('sidebar.php'); ?>

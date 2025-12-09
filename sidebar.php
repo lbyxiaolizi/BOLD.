@@ -8,7 +8,7 @@
             <div class="w-24 h-24 border-4 border-black overflow-hidden shadow-[4px_4px_0px_0px_#000] mb-4">
                 <img src="<?php $this->options->avatarUrl(); ?>" alt="Avatar" class="w-full h-full object-cover">
             </div>
-            <h3 class="font-black text-xl uppercase mb-2">lbyxiaolizi</h3>
+            <h3 class="font-black text-xl uppercase mb-2"><?php echo $this->options->sidebarAuthorName ? $this->options->sidebarAuthorName() : $this->author(); ?></h3>
             <p class="font-bold text-sm text-gray-700 mb-4"><?php $this->options->description(); ?></p>
             
             <div class="flex gap-3">
