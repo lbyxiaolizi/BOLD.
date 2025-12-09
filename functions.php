@@ -154,6 +154,16 @@ Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verif
  */
 
 /**
+ * 安全清理分类slug用于Cookie名称
+ * @param string $slug 分类slug
+ * @return string 清理后的slug
+ */
+function sanitizeCategorySlugForCookie($slug) {
+    // 只允许字母、数字、下划线和短横线
+    return preg_replace('/[^a-zA-Z0-9_-]/', '', $slug);
+}
+
+/**
  * 解析分类密码配置
  * @return array 返回 分类slug => 密码 的映射数组
  */
@@ -174,7 +184,7 @@ function parseCategoryPasswords() {
                 continue;
             }
             // Split on first colon only (allows password to contain colons)
-            [$slug, $password] = explode(':', $line, 2);
+            list($slug, $password) = explode(':', $line, 2);
             $slug = trim($slug);
             $password = trim($password);
             if (!empty($slug) && !empty($password)) {
@@ -278,7 +288,8 @@ function isPasswordVerified($archive) {
     
     // 如果是分类密码保护，检查分类特定的Cookie
     if ($categorySlug !== null) {
-        $cookieName = 'bold_category_verified_' . $categorySlug;
+        $safeCategorySlug = sanitizeCategorySlugForCookie($categorySlug);
+        $cookieName = 'bold_category_verified_' . $safeCategorySlug;
         $verifiedHash = Typecho_Cookie::get($cookieName);
         if (!empty($verifiedHash)) {
             // 验证分类特定密码的哈希
@@ -325,11 +336,11 @@ function handlePasswordVerification($archive) {
         $siteUrl = $options->siteUrl;
         
         // Extract hostname from both URLs for exact matching
-        $refererHost = !empty($referer) ? parse_url($referer, PHP_URL_HOST) : '';
+        $refererHost = !empty($referer) ? parse_url($referer, PHP_URL_HOST) : false;
         $siteHost = parse_url($siteUrl, PHP_URL_HOST);
         
-        // Strict hostname comparison - must match exactly
-        if (empty($refererHost) || $refererHost !== $siteHost) {
+        // Strict hostname comparison - must match exactly, handle false return from parse_url
+        if ($refererHost === false || $siteHost === false || $refererHost !== $siteHost) {
             return true; // 返回错误状态
         }
         
@@ -341,8 +352,9 @@ function handlePasswordVerification($archive) {
             $passwordHash = hash('sha256', $correctPassword . getBoldSecretSalt());
             
             if ($categorySlug !== null) {
+                $safeCategorySlug = sanitizeCategorySlugForCookie($categorySlug);
                 // 设置分类特定的Cookie
-                $cookieName = 'bold_category_verified_' . $categorySlug;
+                $cookieName = 'bold_category_verified_' . $safeCategorySlug;
                 Typecho_Cookie::set($cookieName, $passwordHash, time() + 604800);
             } else {
                 // 设置全站密码Cookie
