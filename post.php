@@ -3,7 +3,7 @@
 
 <?php
 // 处理密码验证
-$passwordError = handlePasswordVerification();
+$passwordError = handlePasswordVerification($this);
 $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
 ?>
 
@@ -45,7 +45,12 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
         <?php else: ?>
         <!-- 正常内容 -->
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none prose-strong:font-black prose-strong:bg-pink-200 prose-strong:px-1 dark:prose-invert">
-            <?php echo parseReplyContent($this->content, $this); ?>
+            <?php 
+                $content = $this->content;
+                $content = parseInlinePasswordContent($content, $this);
+                $content = parseReplyContent($content, $this);
+                echo $content;
+            ?>
         </div>
 
         <div class="px-6 md:px-10 pb-6">

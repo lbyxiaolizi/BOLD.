@@ -26,6 +26,11 @@ $hoverColors = [
     <div>
         <?php while($this->next()): ?>
         <?php 
+            // 如果文章属于加密分类且设置了隐藏，跳过不显示
+            if (shouldHideFromHome($this)) {
+                continue;
+            }
+            
             // 随机卡片悬停颜色
             $randomHover = $hoverColors[array_rand($hoverColors)];
         ?>

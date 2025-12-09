@@ -72,6 +72,14 @@ function themeConfig($form) {
     
     $passwordProtectedCategories = new Typecho_Widget_Helper_Form_Element_Text('passwordProtectedCategories', NULL, NULL, _t('加密分类 (用英文逗号分隔)'), _t('输入需要密码保护的分类别名(slug)，多个用逗号分隔。例如: private,secret'));
     $form->addInput($passwordProtectedCategories);
+    
+    $categoryPasswords = new Typecho_Widget_Helper_Form_Element_Textarea('categoryPasswords', NULL, NULL, _t('分类独立密码设置'), _t('为不同的分类设置不同的密码。格式：分类slug:密码，每行一个。例如：<br>private:password123<br>secret:mySecret456<br>如果某分类未单独设置密码，将使用全站加密密码'));
+    $form->addInput($categoryPasswords);
+    
+    $hideProtectedCategoriesFromHome = new Typecho_Widget_Helper_Form_Element_Radio('hideProtectedCategoriesFromHome',
+        array('1' => _t('隐藏'), '0' => _t('显示')),
+        '0', _t('加密分类文章在首页的显示'), _t('选择是否在首页隐藏属于加密分类的文章'));
+    $form->addInput($hideProtectedCategoriesFromHome);
 }
 
 /**
@@ -151,29 +159,131 @@ Typecho_Plugin::factory('Widget_Feedback')->comment = array('ThemeHooks', 'verif
  */
 
 /**
- * 检查文章是否需要密码保护
+ * 安全清理分类slug用于Cookie名称
+ * @param string $slug 分类slug
+ * @return string 清理后的slug
  */
-function isPasswordProtected($archive) {
+function sanitizeCategorySlugForCookie($slug) {
+    // 只允许字母、数字、下划线和短横线
+    return preg_replace('/[^a-zA-Z0-9_-]/', '', $slug);
+}
+
+/**
+ * 解析分类密码配置
+ * @return array 返回 分类slug => 密码 的映射数组
+ */
+function parseCategoryPasswords() {
     $options = Helper::options();
+    $categoryPasswords = array();
+    
+    if (!empty($options->categoryPasswords)) {
+        $lines = explode("\n", $options->categoryPasswords);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Skip empty lines
+            if (empty($line)) {
+                continue;
+            }
+            // Check that there's at least one colon
+            if (strpos($line, ':') === false) {
+                continue;
+            }
+            // Split on first colon only (allows password to contain colons)
+            list($slug, $password) = explode(':', $line, 2);
+            $slug = trim($slug);
+            $password = trim($password);
+            if (!empty($slug) && !empty($password)) {
+                $categoryPasswords[$slug] = $password;
+            }
+        }
+    }
+    
+    return $categoryPasswords;
+}
+
+/**
+ * 获取文章/分类所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
+ * @param object $archive 文章/分类对象
+ * @return string|null 返回需要的密码，如果不需要密码则返回null
+ */
+function getRequiredPassword($archive) {
+    $options = Helper::options();
+    $categoryPasswords = parseCategoryPasswords();
+    
+    // 优先检查文章自定义字段中的密码（单篇文章密码）
+    if ($archive->is('single') && isset($archive->fields->password) && !empty($archive->fields->password)) {
+        return $archive->fields->password;
+    }
+    
+    // 获取受保护的分类slug（支持文章页和分类页）
+    $categorySlug = getProtectedCategorySlug($archive);
+    
+    if ($categorySlug !== null) {
+        // 如果有分类独立密码，使用分类密码
+        if (isset($categoryPasswords[$categorySlug]) && !empty($categoryPasswords[$categorySlug])) {
+            return $categoryPasswords[$categorySlug];
+        }
+        // 否则使用全站密码
+        if (!empty($options->postPassword)) {
+            return $options->postPassword;
+        }
+        // 如果都没有配置密码，使用一个安全的随机值（确保无法被猜测）
+        // 使用站点特定盐值、分类slug和当前日期的组合，每天生成不同的哈希
+        // 这样可以防止未配置密码时被绕过，同时给管理员提示需要配置密码
+        $dateComponent = date('Y-m-d'); // 每天变化
+        return hash('sha256', getBoldSecretSalt() . $categorySlug . $dateComponent . 'no_password_configured');
+    }
     
     // 检查全站密码
     if (!empty($options->postPassword)) {
-        return true;
+        return $options->postPassword;
     }
     
-    // 检查分类密码保护
-    if (!empty($options->passwordProtectedCategories) && $archive->is('single')) {
-        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    return null;
+}
+
+/**
+ * 获取文章所属的受保护分类slug（支持文章页和分类页）
+ * @param object $archive 文章/分类对象
+ * @return string|null 返回受保护的分类slug，如果没有则返回null
+ */
+function getProtectedCategorySlug($archive) {
+    $options = Helper::options();
+    
+    if (empty($options->passwordProtectedCategories)) {
+        return null;
+    }
+    
+    $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    
+    // 如果是分类页面，检查当前分类是否需要密码保护
+    if ($archive->is('category')) {
+        $currentSlug = $archive->slug;
+        if (in_array($currentSlug, $protectedSlugs)) {
+            return $currentSlug;
+        }
+        return null;
+    }
+    
+    // 如果是单篇文章页面，检查文章所属分类
+    if ($archive->is('single')) {
         if (!empty($archive->categories)) {
             foreach ($archive->categories as $category) {
                 if (in_array($category['slug'], $protectedSlugs)) {
-                    return true;
+                    return $category['slug'];
                 }
             }
         }
     }
     
-    return false;
+    return null;
+}
+
+/**
+ * 检查文章是否需要密码保护
+ */
+function isPasswordProtected($archive) {
+    return getRequiredPassword($archive) !== null;
 }
 
 /**
@@ -188,12 +298,32 @@ function isPasswordVerified($archive) {
         return true;
     }
     
-    // 检查 Cookie 中的密码验证状态
+    $requiredPassword = getRequiredPassword($archive);
+    if ($requiredPassword === null) {
+        return true; // 不需要密码
+    }
+    
+    // 获取受保护的分类slug（如果是分类保护）
+    $categorySlug = getProtectedCategorySlug($archive);
+    
+    // 如果是分类密码保护，检查分类特定的Cookie
+    if ($categorySlug !== null) {
+        $safeCategorySlug = sanitizeCategorySlugForCookie($categorySlug);
+        $cookieName = 'bold_category_verified_' . $safeCategorySlug;
+        $verifiedHash = Typecho_Cookie::get($cookieName);
+        if (!empty($verifiedHash)) {
+            // 验证分类特定密码的哈希
+            if (hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
+                return true;
+            }
+        }
+    }
+    
+    // 检查全站密码验证
     $verifiedHash = Typecho_Cookie::get('bold_password_verified');
     if (!empty($verifiedHash)) {
-        $password = $options->postPassword;
         // 使用更安全的哈希比较
-        if (!empty($password) && hash_equals(hash('sha256', $password . getBoldSecretSalt()), $verifiedHash)) {
+        if (!empty($requiredPassword) && hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
             return true;
         }
     }
@@ -212,23 +342,44 @@ function getBoldSecretSalt() {
 /**
  * 处理密码验证请求
  */
-function handlePasswordVerification() {
+function handlePasswordVerification($archive) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bold_password'])) {
         $options = Helper::options();
         // 输入清理
         $inputPassword = isset($_POST['bold_password']) ? strval($_POST['bold_password']) : '';
-        $correctPassword = $options->postPassword;
+        
+        // 获取当前文章需要的正确密码
+        $correctPassword = getRequiredPassword($archive);
         
         // CSRF 保护 - 验证来源
         $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
         $siteUrl = $options->siteUrl;
-        if (empty($referer) || strpos($referer, parse_url($siteUrl, PHP_URL_HOST)) === false) {
+        
+        // Extract hostname from both URLs for exact matching
+        $refererHost = !empty($referer) ? parse_url($referer, PHP_URL_HOST) : false;
+        $siteHost = parse_url($siteUrl, PHP_URL_HOST);
+        
+        // Strict hostname comparison - must match exactly, handle false return from parse_url
+        if ($refererHost === false || $siteHost === false || $refererHost !== $siteHost) {
             return true; // 返回错误状态
         }
         
         if (!empty($correctPassword) && $inputPassword === $correctPassword) {
+            // 获取分类slug（如果是分类保护）
+            $categorySlug = getProtectedCategorySlug($archive);
+            
             // 使用更安全的哈希，设置验证 Cookie (有效期 7 天)
-            Typecho_Cookie::set('bold_password_verified', hash('sha256', $correctPassword . getBoldSecretSalt()), time() + 604800);
+            $passwordHash = hash('sha256', $correctPassword . getBoldSecretSalt());
+            
+            if ($categorySlug !== null) {
+                $safeCategorySlug = sanitizeCategorySlugForCookie($categorySlug);
+                // 设置分类特定的Cookie
+                $cookieName = 'bold_category_verified_' . $safeCategorySlug;
+                Typecho_Cookie::set($cookieName, $passwordHash, time() + 604800);
+            } else {
+                // 设置全站密码Cookie
+                Typecho_Cookie::set('bold_password_verified', $passwordHash, time() + 604800);
+            }
             
             // 安全重定向 - 仅使用路径部分
             $redirectPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -250,9 +401,30 @@ function renderPasswordForm($archive, $hasError = false) {
     $lang = Helper::options()->languageSetting;
     if (empty($lang)) $lang = 'en';
     
+    // 获取受保护的分类信息
+    $categorySlug = getProtectedCategorySlug($archive);
+    $categoryName = null;
+    if ($categorySlug && !empty($archive->categories)) {
+        foreach ($archive->categories as $category) {
+            if ($category['slug'] === $categorySlug) {
+                $categoryName = $category['name'];
+                break;
+            }
+        }
+    }
+    
+    // 根据是否有分类信息调整描述文本
+    if ($categoryName) {
+        $desc = $lang === 'cn' 
+            ? "此内容属于加密分类「{$categoryName}」，请输入分类密码查看。" 
+            : "This content belongs to the encrypted category \"{$categoryName}\". Please enter the category password to view.";
+    } else {
+        $desc = $lang === 'cn' ? '此内容受密码保护，请输入密码查看。' : 'This content is password protected. Please enter the password to view.';
+    }
+    
     $texts = array(
         'title' => $lang === 'cn' ? '需要密码' : 'PASSWORD REQUIRED',
-        'desc' => $lang === 'cn' ? '此内容受密码保护，请输入密码查看。' : 'This content is password protected. Please enter the password to view.',
+        'desc' => $desc,
         'placeholder' => $lang === 'cn' ? '请输入密码...' : 'Enter password...',
         'submit' => $lang === 'cn' ? '解锁' : 'UNLOCK',
         'error' => $lang === 'cn' ? '密码错误，请重试' : 'Incorrect password, please try again',
@@ -369,11 +541,171 @@ function parseReplyContent($content, $archive) {
 }
 
 /**
- * 摘要输出
+ * 解析内联密码保护内容 {password:密码}内容{/password}
+ */
+function parseInlinePasswordContent($content, $archive) {
+    // 如果不是单页面或没有密码标签，直接返回
+    if (!$archive->is('single') || strpos($content, '{password:') === false) {
+        // 在列表页移除所有密码保护内容（要求至少一个字符的密码）
+        return preg_replace("/{password:[^}]+}(.*?){\/password}/sm", '', $content);
+    }
+    
+    // 查找所有密码保护的内容块（要求至少一个字符的密码）
+    preg_match_all("/{password:([^}]+)}(.*?){\/password}/sm", $content, $matches, PREG_SET_ORDER);
+    
+    if (empty($matches)) {
+        return $content;
+    }
+    
+    $user = Typecho_Widget::widget('Widget_User');
+    $lang = Helper::options()->languageSetting;
+    if (empty($lang)) $lang = 'en';
+    
+    foreach ($matches as $match) {
+        $fullMatch = $match[0];
+        $requiredPassword = trim($match[1]);
+        $protectedContent = $match[2];
+        
+        // 已登录用户且是文章作者，直接显示内容
+        if ($user->hasLogin() && $user->uid == $archive->authorId) {
+            $replacement = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                            <p class="font-bold text-green-700 dark:text-green-400 m-0">🔓 内容已解锁（作者）/ UNLOCKED (Author)</p>
+                        </div>' . $protectedContent;
+            $content = str_replace($fullMatch, $replacement, $content);
+            continue;
+        }
+        
+        // 验证密码不为空（去除空白后）
+        if (empty($requiredPassword)) {
+            // 跳过空密码的块
+            continue;
+        }
+        
+        // 生成内容块的唯一ID（使用 SHA-256 而不是 MD5 以保持安全一致性）
+        $blockId = substr(hash('sha256', $requiredPassword . $protectedContent . getBoldSecretSalt()), 0, 12);
+        $blockId = sanitizeCategorySlugForCookie($blockId); // 确保Cookie名称安全
+        $cookieName = 'bold_inline_verified_' . $blockId;
+        
+        // 检查是否已验证
+        $verifiedHash = Typecho_Cookie::get($cookieName);
+        $isVerified = false;
+        
+        if (!empty($verifiedHash) && !empty($requiredPassword)) {
+            if (hash_equals(hash('sha256', $requiredPassword . getBoldSecretSalt()), $verifiedHash)) {
+                $isVerified = true;
+            }
+        }
+        
+        // 处理密码提交
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inline_password_' . $blockId])) {
+            $inputPassword = isset($_POST['inline_password_' . $blockId]) ? strval($_POST['inline_password_' . $blockId]) : '';
+            
+            if (!empty($requiredPassword) && $inputPassword === $requiredPassword) {
+                $passwordHash = hash('sha256', $requiredPassword . getBoldSecretSalt());
+                Typecho_Cookie::set($cookieName, $passwordHash, time() + 604800);
+                $isVerified = true;
+            }
+        }
+        
+        if ($isVerified) {
+            // 显示已解锁的内容
+            $replacement = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                            <p class="font-bold text-green-700 dark:text-green-400 m-0">🔓 内容已解锁 / UNLOCKED</p>
+                        </div>' . $protectedContent;
+        } else {
+            // 显示密码输入表单
+            $errorMsg = '';
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inline_password_' . $blockId])) {
+                $errorMsg = $lang === 'cn' ? '密码错误，请重试' : 'Incorrect password, please try again';
+            }
+            
+            $placeholderText = $lang === 'cn' ? '输入密码解锁此内容...' : 'Enter password to unlock...';
+            $submitText = $lang === 'cn' ? '解锁' : 'UNLOCK';
+            
+            $replacement = '
+            <div class="inline-password-container my-6">
+                <div class="inline-password-inner flex flex-col items-center justify-center text-center p-6">
+                    <div class="text-4xl mb-3">🔐</div>
+                    <h4 class="text-lg font-black uppercase mb-3">' . ($lang === 'cn' ? '密码保护内容' : 'PASSWORD PROTECTED') . '</h4>';
+            
+            if (!empty($errorMsg)) {
+                $replacement .= '<div class="bg-red-100 border-2 border-red-500 text-red-700 px-3 py-2 mb-3 font-bold text-sm">' . $errorMsg . '</div>';
+            }
+            
+            $replacement .= '<form method="post" class="w-full max-w-xs">
+                        <input type="password" name="inline_password_' . $blockId . '" placeholder="' . $placeholderText . '" 
+                            class="w-full p-2 font-bold border-2 border-black focus:outline-none focus:border-pink-500 mb-3 text-center text-sm dark:bg-[#121212] dark:text-white dark:border-[#10b981]" required>
+                        <button type="submit" class="w-full bg-black text-white px-4 py-2 font-black text-sm uppercase tracking-wider hover:bg-pink-500 transition-colors border-2 border-black shadow-[2px_2px_0px_0px_#000] dark:bg-[#10b981] dark:text-black dark:border-[#10b981] dark:shadow-[2px_2px_0px_0px_#000]">
+                            ' . $submitText . '
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <style>
+                .inline-password-container {
+                    background: repeating-linear-gradient(45deg, #fef08a, #fef08a 15px, #000 15px, #000 30px);
+                    padding: 6px; border: 2px solid #000; box-shadow: 4px 4px 0px 0px #000;
+                }
+                .inline-password-inner { background: #fff; border: 2px solid #000; }
+                body.dark-mode .inline-password-container {
+                    background: repeating-linear-gradient(45deg, #064e3b, #064e3b 15px, #000 15px, #000 30px);
+                    border-color: #10b981; box-shadow: 4px 4px 0px 0px #10b981;
+                }
+                body.dark-mode .inline-password-inner { background: #121212; border-color: #10b981; color: #e5e5e5; }
+            </style>';
+        }
+        
+        $content = str_replace($fullMatch, $replacement, $content);
+    }
+    
+    return $content;
+}
+
+/**
+ * 检查文章是否应该从首页隐藏（属于加密分类且设置了隐藏）
+ * @param object $archive 文章对象
+ * @return bool 返回true表示应该隐藏
+ */
+function shouldHideFromHome($archive) {
+    $options = Helper::options();
+    
+    // 如果未启用隐藏功能，返回false
+    if (empty($options->hideProtectedCategoriesFromHome) || $options->hideProtectedCategoriesFromHome == '0') {
+        return false;
+    }
+    
+    // 检查文章是否属于加密分类
+    if (empty($options->passwordProtectedCategories) || empty($archive->categories)) {
+        return false;
+    }
+    
+    $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    
+    foreach ($archive->categories as $category) {
+        if (in_array($category['slug'], $protectedSlugs)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * 摘要输出 - 如果文章属于加密分类且未验证密码，显示提示信息
  */
 function printExcerpt($archive, $length = 140) {
+    // 检查是否属于加密分类
+    if (getProtectedCategorySlug($archive) !== null && !isPasswordVerified($archive)) {
+        $lang = Helper::options()->languageSetting;
+        if (empty($lang)) $lang = 'en';
+        $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
+        echo $text;
+        return;
+    }
+    
     $content = $archive->content;
     $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
+    $content = preg_replace("/{password:[^}]+}(.*?){\/password}/sm", '', $content);
     $content = strip_tags($content);
     echo Typecho_Common::subStr($content, 0, $length, '...');
 }
