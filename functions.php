@@ -546,11 +546,11 @@ function parseReplyContent($content, $archive) {
 function parseInlinePasswordContent($content, $archive) {
     // 如果不是单页面或没有密码标签，直接返回
     if (!$archive->is('single') || strpos($content, '{password:') === false) {
-        // 在列表页移除所有密码保护内容
-        return preg_replace("/{password:[^}]*}(.*?){\/password}/sm", '', $content);
+        // 在列表页移除所有密码保护内容（要求至少一个字符的密码）
+        return preg_replace("/{password:[^}]+}(.*?){\/password}/sm", '', $content);
     }
     
-    // 查找所有密码保护的内容块
+    // 查找所有密码保护的内容块（要求至少一个字符的密码）
     preg_match_all("/{password:([^}]+)}(.*?){\/password}/sm", $content, $matches, PREG_SET_ORDER);
     
     if (empty($matches)) {
@@ -698,7 +698,7 @@ function printExcerpt($archive, $length = 140) {
     
     $content = $archive->content;
     $content = preg_replace("/{hide}(.*?){\/hide}/sm", '', $content);
-    $content = preg_replace("/{password:[^}]*}(.*?){\/password}/sm", '', $content);
+    $content = preg_replace("/{password:[^}]+}(.*?){\/password}/sm", '', $content);
     $content = strip_tags($content);
     echo Typecho_Common::subStr($content, 0, $length, '...');
 }
