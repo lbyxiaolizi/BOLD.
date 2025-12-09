@@ -212,6 +212,49 @@
             border-color: var(--border-color) !important; 
             box-shadow: 6px 6px 0px 0px var(--border-color) !important; 
         }
+
+        /* 修复移动端代码块和公式溢出问题 */
+        .prose pre {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .prose code {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .prose pre code {
+            word-wrap: normal;
+            overflow-wrap: normal;
+            white-space: pre;
+        }
+
+        /* MathJax 公式溢出处理 */
+        .prose .MathJax,
+        .prose mjx-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 移动端特别优化 */
+        @media (max-width: 767px) {
+            .prose pre {
+                padding: 1rem;
+                margin-left: -1rem;
+                margin-right: -1rem;
+                border-radius: 0;
+            }
+
+            .prose .MathJax,
+            .prose mjx-container {
+                font-size: 0.9em;
+            }
+        }
         
         /* 输入框 */
         .dark-mode input, .dark-mode textarea { 
