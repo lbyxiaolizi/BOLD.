@@ -222,12 +222,10 @@
         }
 
         .prose code {
-            word-wrap: break-word;
             overflow-wrap: break-word;
         }
 
         .prose pre code {
-            word-wrap: normal;
             overflow-wrap: normal;
             white-space: pre;
         }
@@ -245,6 +243,7 @@
         @media (max-width: 767px) {
             .prose pre {
                 padding: 1rem;
+                /* 负边距使代码块扩展到容器边缘，更好地利用移动端屏幕空间 */
                 margin-left: -1rem;
                 margin-right: -1rem;
                 border-radius: 0;
