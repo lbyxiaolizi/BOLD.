@@ -80,6 +80,11 @@ function themeConfig($form) {
         array('1' => _t('隐藏'), '0' => _t('显示')),
         '0', _t('加密分类文章在首页的显示'), _t('选择是否在首页隐藏属于加密分类的文章'));
     $form->addInput($hideProtectedCategoriesFromHome);
+    
+    $requirePasswordForCategoryArchive = new Typecho_Widget_Helper_Form_Element_Radio('requirePasswordForCategoryArchive',
+        array('1' => _t('是'), '0' => _t('否')),
+        '1', _t('加密分类的归档界面是否需要密码验证'), _t('选择访问加密分类的归档页面时是否需要输入密码'));
+    $form->addInput($requirePasswordForCategoryArchive);
 }
 
 /**
@@ -277,6 +282,27 @@ function getProtectedCategorySlug($archive) {
     }
     
     return null;
+}
+
+/**
+ * 检查文章是否仅通过分类加密（而非文章独立密码）
+ * @param object $archive 文章对象
+ * @return bool 如果文章仅通过分类加密返回true，否则返回false
+ */
+function isOnlyCategoryEncrypted($archive) {
+    // 如果不是单篇文章页面，返回false
+    if (!$archive->is('single')) {
+        return false;
+    }
+    
+    // 如果文章有独立密码字段，返回false（因为不是"仅"通过分类加密）
+    if (isset($archive->fields->password) && !empty($archive->fields->password)) {
+        return false;
+    }
+    
+    // 检查文章是否属于受保护的分类
+    $categorySlug = getProtectedCategorySlug($archive);
+    return $categorySlug !== null;
 }
 
 /**
@@ -691,11 +717,27 @@ function shouldHideFromHome($archive) {
 }
 
 /**
- * 摘要输出 - 如果文章属于加密分类且未验证密码，显示提示信息
+ * 摘要输出 - 如果文章属于加密分类且未验证密码，根据设置显示提示信息或隐藏摘要
  */
 function printExcerpt($archive, $length = 140) {
+    $options = Helper::options();
+    
     // 检查是否属于加密分类
     if (getProtectedCategorySlug($archive) !== null && !isPasswordVerified($archive)) {
+        // 如果文章仅通过分类加密（没有文章独立密码）
+        if (isOnlyCategoryEncrypted($archive)) {
+            // 根据设置决定是否隐藏摘要
+            // 条件：如果"隐藏加密分类文章在首页的显示"为开(1) 或 "加密分类的归档界面需要密码验证"为否(0)，则隐藏摘要
+            $hideFromHome = !empty($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
+            $requireArchivePassword = empty($options->requirePasswordForCategoryArchive) || $options->requirePasswordForCategoryArchive == '0';
+            
+            if ($hideFromHome || $requireArchivePassword) {
+                // 隐藏摘要，不显示任何内容
+                return;
+            }
+        }
+        
+        // 显示密码保护提示
         $lang = Helper::options()->languageSetting;
         if (empty($lang)) $lang = 'en';
         $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
