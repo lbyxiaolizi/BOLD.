@@ -403,14 +403,15 @@
         .dark-mode div.code-toolbar > .toolbar button {
             background: var(--accent-color) !important;
             color: #000 !important;
-            border-color: var(--border-color) !important;
+            border-color: #000 !important;
             box-shadow: 3px 3px 0px 0px #000 !important;
         }
 
         .dark-mode div.code-toolbar > .toolbar button:hover {
             background: #064e3b !important;
             color: var(--accent-color) !important;
-            box-shadow: 1px 1px 0px 0px #000 !important;
+            border-color: var(--accent-color) !important;
+            box-shadow: 1px 1px 0px 0px var(--accent-color) !important;
         }
 
         /* 移动端代码块字体大小优化 */
