@@ -263,10 +263,29 @@ function getProtectedCategorySlug($archive) {
     
     // 如果是分类页面，检查当前分类是否需要密码保护
     if ($archive->is('category')) {
-        $currentSlug = $archive->slug;
-        if (in_array($currentSlug, $protectedSlugs)) {
+        $currentSlug = isset($archive->slug) ? $archive->slug : null;
+
+        if (empty($currentSlug)) {
+            // Fallback to request parameters (slug or mid) to resolve the category slug
+            $request = Typecho_Request::getInstance();
+            $currentSlug = $request->get('slug');
+
+            if (empty($currentSlug)) {
+                $mid = $request->get('mid');
+                if (!empty($mid)) {
+                    $db = Typecho_Db::get();
+                    $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
+                    if ($meta && !empty($meta['slug'])) {
+                        $currentSlug = $meta['slug'];
+                    }
+                }
+            }
+        }
+
+        if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
             return $currentSlug;
         }
+
         return null;
     }
     
