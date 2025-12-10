@@ -313,6 +313,22 @@ function getProtectedCategorySlug($archive) {
         $currentSlug = isset($archive->slug) ? $archive->slug : null;
         if (empty($currentSlug)) {
             $currentSlug = resolveCategorySlugFromRequest();
+
+        if (empty($currentSlug)) {
+            // Fallback to request parameters (slug or mid) to resolve the category slug
+            $request = Typecho_Request::getInstance();
+            $currentSlug = $request->get('slug');
+
+            if (empty($currentSlug)) {
+                $mid = $request->get('mid');
+                if (!empty($mid)) {
+                    $db = Typecho_Db::get();
+                    $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
+                    if ($meta && !empty($meta['slug'])) {
+                        $currentSlug = $meta['slug'];
+                    }
+                }
+            }
         }
 
         if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
