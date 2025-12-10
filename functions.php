@@ -322,27 +322,42 @@ function getProtectedCategorySlug($archive) {
     
     // 如果是分类页面，检查当前分类是否需要密码保护
     if ($archive->is('category')) {
-        $currentSlug = isset($archive->slug) ? $archive->slug : null;
+        $candidateSlugs = array();
 
-        if (empty($currentSlug)) {
-            // Fallback to request parameters (slug or mid) to resolve the category slug
-            $request = Typecho_Request::getInstance();
-            $currentSlug = $request->get('slug');
+        if (isset($archive->slug) && !empty($archive->slug)) {
+            $candidateSlugs[] = $archive->slug;
+        }
 
-            if (empty($currentSlug)) {
-                $mid = $request->get('mid');
-                if (!empty($mid)) {
-                    $db = Typecho_Db::get();
-                    $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
-                    if ($meta && !empty($meta['slug'])) {
-                        $currentSlug = $meta['slug'];
-                    }
-                }
+        // 请求参数中的 slug（Typecho 路由变量）
+        if (isset($archive->request) && !empty($archive->request->slug)) {
+            $candidateSlugs[] = $archive->request->slug;
+        }
+
+        // 归档参数中的 slug（某些情况下会存放在 parameter 对象内）
+        if (isset($archive->parameter) && !empty($archive->parameter->slug)) {
+            $candidateSlugs[] = $archive->parameter->slug;
+        }
+
+        // 路径或 mid 解析的 slug 兜底
+        $resolvedSlug = resolveCategorySlugFromRequest();
+        if (!empty($resolvedSlug)) {
+            $candidateSlugs[] = $resolvedSlug;
+        }
+
+        foreach ($candidateSlugs as $currentSlug) {
+            $currentSlug = trim($currentSlug);
+            if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
+                return $currentSlug;
             }
         }
 
-        if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
-            return $currentSlug;
+        // 某些情况下分类归档对象会携带 categories 列表，但不包含 slug 字段
+        if (!empty($archive->categories)) {
+            foreach ($archive->categories as $category) {
+                if (!empty($category['slug']) && in_array($category['slug'], $protectedSlugs)) {
+                    return $category['slug'];
+                }
+            }
         }
 
         return null;
