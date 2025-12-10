@@ -263,20 +263,37 @@ function getProtectedCategorySlug($archive) {
     
     // 如果是分类页面，检查当前分类是否需要密码保护
     if ($archive->is('category')) {
-        $currentSlug = $archive->slug;
-        if (in_array($currentSlug, $protectedSlugs)) {
+        $currentSlug = isset($archive->slug) ? $archive->slug : null;
+
+        if (empty($currentSlug)) {
+            // Fallback to request parameters (slug or mid) to resolve the category slug
+            $request = Typecho_Request::getInstance();
+            $currentSlug = $request->get('slug');
+
+            if (empty($currentSlug)) {
+                $mid = $request->get('mid');
+                if (!empty($mid)) {
+                    $db = Typecho_Db::get();
+                    $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
+                    if ($meta && !empty($meta['slug'])) {
+                        $currentSlug = $meta['slug'];
+                    }
+                }
+            }
+        }
+
+        if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
             return $currentSlug;
         }
+
         return null;
     }
     
-    // 如果是单篇文章页面，检查文章所属分类
-    if ($archive->is('single')) {
-        if (!empty($archive->categories)) {
-            foreach ($archive->categories as $category) {
-                if (in_array($category['slug'], $protectedSlugs)) {
-                    return $category['slug'];
-                }
+    // 检查文章所属分类（在列表页和文章页都需要检测，避免摘要泄露）
+    if (!empty($archive->categories)) {
+        foreach ($archive->categories as $category) {
+            if (in_array($category['slug'], $protectedSlugs)) {
+                return $category['slug'];
             }
         }
     }
@@ -710,9 +727,10 @@ function printExcerpt($archive, $length = 140) {
         // 获取配置选项
         $hideFromHome = !empty($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
         $requireArchivePassword = empty($options->requireCategoryArchivePassword) || $options->requireCategoryArchivePassword == '1';
-        
+
         // 判断是否需要隐藏摘要
-        $shouldHideExcerpt = $hideFromHome || !$requireArchivePassword || !isPasswordVerified($archive);
+        // 需求：如果首页隐藏开启，或分类归档无需密码，则不显示摘要内容
+        $shouldHideExcerpt = $hideFromHome || !$requireArchivePassword;
         
         if ($shouldHideExcerpt) {
             $lang = $options->languageSetting;
