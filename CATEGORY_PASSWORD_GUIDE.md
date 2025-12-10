@@ -45,6 +45,19 @@
    - 选择"隐藏"：加密分类的文章不会出现在首页列表中
    - 选择"显示"（默认）：加密分类的文章会在首页显示，但摘要会显示提示信息
 
+6. **设置加密分类的归档页面是否需要密码验证**
+   - 在"加密分类的归档页面是否需要密码验证"选项中，选择"需要"或"不需要"
+   - 选择"需要"（默认）：访问加密分类归档页面时需要先输入密码才能查看文章列表
+   - 选择"不需要"：访问加密分类归档页面时不需要密码，可以直接看到文章列表
+   - 注意：当选择"不需要"时，为防止内容通过摘要泄露，文章摘要将自动隐藏显示为密码保护提示
+
+#### 摘要显示规则
+
+为了防止加密文章内容通过摘要泄露，系统采用以下规则：
+- 如果"加密分类文章在首页的显示"设为"隐藏"，摘要会显示密码保护提示
+- 如果"加密分类的归档页面是否需要密码验证"设为"不需要"，摘要会显示密码保护提示
+- 只有当文章在首页显示且归档页面需要密码验证时，摘要才会正常显示（因为此时内容在所有位置都受到保护）
+
 #### 分类页密码保护
 
 - 访问加密分类的归档页面（例如 `/category/private`）时也需要输入密码
@@ -197,6 +210,19 @@ Visitors can access encrypted content after entering the correct password. Passw
    - In "Encrypted category articles on homepage display" option, select "Hide" or "Show"
    - Select "Hide": Articles from encrypted categories won't appear on the homepage list
    - Select "Show" (default): Articles from encrypted categories will appear on homepage, but excerpt shows a protection notice
+
+6. **Set Category Archive Page Password Verification**
+   - In "Require password for category archive page" option, select "Required" or "Not Required"
+   - Select "Required" (default): Accessing encrypted category archive pages requires password before viewing article list
+   - Select "Not Required": Accessing encrypted category archive pages doesn't require password, article list is visible
+   - Note: When set to "Not Required", to prevent content leakage through excerpts, article excerpts will automatically be hidden and show password protection notice
+
+#### Excerpt Display Rules
+
+To prevent encrypted article content from leaking through excerpts, the system follows these rules:
+- If "Encrypted category articles on homepage display" is set to "Hide", excerpts show password protection notice
+- If "Require password for category archive page" is set to "Not Required", excerpts show password protection notice
+- Only when articles are visible on homepage AND archive pages require password verification will excerpts display normally (because content is protected at all locations)
 
 #### Category Page Password Protection
 
