@@ -174,6 +174,53 @@ function sanitizeCategorySlugForCookie($slug) {
 }
 
 /**
+ * 从请求中解析分类 slug，兼容 /category/{slug}/ 或包含 index.php 的路径
+ * @return string|null
+ */
+function resolveCategorySlugFromRequest() {
+    $request = Typecho_Request::getInstance();
+
+    // 1) 优先显式参数
+    $slug = $request->get('slug');
+    if (!empty($slug)) {
+        return $slug;
+    }
+
+    // 2) 从路径解析
+    $pathInfo = trim($request->getPathInfo(), '/');
+    if (!empty($pathInfo)) {
+        $segments = array_values(array_filter(explode('/', $pathInfo)));
+
+        // 在路径中找到 "category" 段，取其后的下一个元素作为 slug
+        $categoryIndex = array_search('category', $segments, true);
+        if ($categoryIndex !== false && isset($segments[$categoryIndex + 1])) {
+            $slugCandidate = $segments[$categoryIndex + 1];
+        } else {
+            // 如果不存在明确的 category 段，尝试使用最后一个段
+            $slugCandidate = end($segments);
+        }
+
+        if (!empty($slugCandidate)) {
+            // 去除可能的后缀（如 .html）并解码
+            $slugCandidate = preg_replace('/\.(html?|php)$/i', '', $slugCandidate);
+            return urldecode($slugCandidate);
+        }
+    }
+
+    // 3) 通过 mid 查找
+    $mid = $request->get('mid');
+    if (!empty($mid)) {
+        $db = Typecho_Db::get();
+        $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
+        if ($meta && !empty($meta['slug'])) {
+            return $meta['slug'];
+        }
+    }
+
+    return null;
+}
+
+/**
  * 解析分类密码配置
  * @return array 返回 分类slug => 密码 的映射数组
  */
@@ -264,6 +311,8 @@ function getProtectedCategorySlug($archive) {
     // 如果是分类页面，检查当前分类是否需要密码保护
     if ($archive->is('category')) {
         $currentSlug = isset($archive->slug) ? $archive->slug : null;
+        if (empty($currentSlug)) {
+            $currentSlug = resolveCategorySlugFromRequest();
 
         if (empty($currentSlug)) {
             // Fallback to request parameters (slug or mid) to resolve the category slug
