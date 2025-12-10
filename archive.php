@@ -7,8 +7,14 @@ $passwordError = false;
 $needsPassword = false;
 
 if ($this->is('category')) {
-    $passwordError = handlePasswordVerification($this);
-    $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
+    // 检查是否需要分类归档页密码验证
+    $options = Helper::options();
+    $requireArchivePassword = empty($options->requireCategoryArchivePassword) || $options->requireCategoryArchivePassword == '1';
+    
+    if ($requireArchivePassword) {
+        $passwordError = handlePasswordVerification($this);
+        $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
+    }
 }
 
 $hoverColors = [

@@ -80,6 +80,11 @@ function themeConfig($form) {
         array('1' => _t('隐藏'), '0' => _t('显示')),
         '0', _t('加密分类文章在首页的显示'), _t('选择是否在首页隐藏属于加密分类的文章'));
     $form->addInput($hideProtectedCategoriesFromHome);
+    
+    $requireCategoryArchivePassword = new Typecho_Widget_Helper_Form_Element_Radio('requireCategoryArchivePassword',
+        array('1' => _t('需要'), '0' => _t('不需要')),
+        '1', _t('加密分类的归档页面是否需要密码验证'), _t('选择访问加密分类的归档页面时是否需要输入密码。选择"需要"时，访问加密分类归档页面需要先验证密码才能查看文章列表'));
+    $form->addInput($requireCategoryArchivePassword);
 }
 
 /**
@@ -691,16 +696,31 @@ function shouldHideFromHome($archive) {
 }
 
 /**
- * 摘要输出 - 如果文章属于加密分类且未验证密码，显示提示信息
+ * 摘要输出 - 如果文章属于加密分类且需要隐藏摘要，显示提示信息
+ * 隐藏摘要的条件：
+ * - 如果 hideProtectedCategoriesFromHome 为开（文章在首页隐藏），或
+ * - 如果 requireCategoryArchivePassword 为关（归档页不需要密码验证）
+ * 则隐藏仅通过分类加密的文章的摘要，否则显示正常摘要
  */
 function printExcerpt($archive, $length = 140) {
+    $options = Helper::options();
+    
     // 检查是否属于加密分类
-    if (getProtectedCategorySlug($archive) !== null && !isPasswordVerified($archive)) {
-        $lang = Helper::options()->languageSetting;
-        if (empty($lang)) $lang = 'en';
-        $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
-        echo $text;
-        return;
+    if (getProtectedCategorySlug($archive) !== null) {
+        // 获取配置选项
+        $hideFromHome = !empty($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
+        $requireArchivePassword = empty($options->requireCategoryArchivePassword) || $options->requireCategoryArchivePassword == '1';
+        
+        // 判断是否需要隐藏摘要
+        $shouldHideExcerpt = $hideFromHome || !$requireArchivePassword || !isPasswordVerified($archive);
+        
+        if ($shouldHideExcerpt) {
+            $lang = $options->languageSetting;
+            if (empty($lang)) $lang = 'en';
+            $text = $lang === 'cn' ? '🔐 此文章内容受密码保护...' : '🔐 This content is password protected...';
+            echo $text;
+            return;
+        }
     }
     
     $content = $archive->content;
