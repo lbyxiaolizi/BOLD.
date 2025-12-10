@@ -174,6 +174,53 @@ function sanitizeCategorySlugForCookie($slug) {
 }
 
 /**
+ * 从请求中解析分类 slug，兼容 /category/{slug}/ 或包含 index.php 的路径
+ * @return string|null
+ */
+function resolveCategorySlugFromRequest() {
+    $request = Typecho_Request::getInstance();
+
+    // 1) 优先显式参数
+    $slug = $request->get('slug');
+    if (!empty($slug)) {
+        return $slug;
+    }
+
+    // 2) 从路径解析
+    $pathInfo = trim($request->getPathInfo(), '/');
+    if (!empty($pathInfo)) {
+        $segments = array_values(array_filter(explode('/', $pathInfo)));
+
+        // 在路径中找到 "category" 段，取其后的下一个元素作为 slug
+        $categoryIndex = array_search('category', $segments, true);
+        if ($categoryIndex !== false && isset($segments[$categoryIndex + 1])) {
+            $slugCandidate = $segments[$categoryIndex + 1];
+        } else {
+            // 如果不存在明确的 category 段，尝试使用最后一个段
+            $slugCandidate = end($segments);
+        }
+
+        if (!empty($slugCandidate)) {
+            // 去除可能的后缀（如 .html）并解码
+            $slugCandidate = preg_replace('/\.(html?|php)$/i', '', $slugCandidate);
+            return urldecode($slugCandidate);
+        }
+    }
+
+    // 3) 通过 mid 查找
+    $mid = $request->get('mid');
+    if (!empty($mid)) {
+        $db = Typecho_Db::get();
+        $meta = $db->fetchRow($db->select('slug')->from('table.metas')->where('mid = ?', $mid)->limit(1));
+        if ($meta && !empty($meta['slug'])) {
+            return $meta['slug'];
+        }
+    }
+
+    return null;
+}
+
+/**
  * 解析分类密码配置
  * @return array 返回 分类slug => 密码 的映射数组
  */
@@ -254,29 +301,73 @@ function getRequiredPassword($archive) {
  */
 function getProtectedCategorySlug($archive) {
     $options = Helper::options();
-    
-    if (empty($options->passwordProtectedCategories)) {
+
+    $protectedSlugs = array();
+
+    if (!empty($options->passwordProtectedCategories)) {
+        $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
+    }
+
+    // 将独立分类密码中的 slug 也视为受保护分类，防止漏配导致归档绕过
+    $categoryPasswords = parseCategoryPasswords();
+    if (!empty($categoryPasswords)) {
+        $protectedSlugs = array_merge($protectedSlugs, array_keys($categoryPasswords));
+    }
+
+    $protectedSlugs = array_values(array_unique(array_filter($protectedSlugs)));
+
+    if (empty($protectedSlugs)) {
         return null;
     }
-    
-    $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
     
     // 如果是分类页面，检查当前分类是否需要密码保护
     if ($archive->is('category')) {
-        $currentSlug = $archive->slug;
-        if (in_array($currentSlug, $protectedSlugs)) {
-            return $currentSlug;
+        $candidateSlugs = array();
+
+        if (isset($archive->slug) && !empty($archive->slug)) {
+            $candidateSlugs[] = $archive->slug;
         }
+
+        // 请求参数中的 slug（Typecho 路由变量）
+        if (isset($archive->request) && !empty($archive->request->slug)) {
+            $candidateSlugs[] = $archive->request->slug;
+        }
+
+        // 归档参数中的 slug（某些情况下会存放在 parameter 对象内）
+        if (isset($archive->parameter) && !empty($archive->parameter->slug)) {
+            $candidateSlugs[] = $archive->parameter->slug;
+        }
+
+        // 路径或 mid 解析的 slug 兜底
+        $resolvedSlug = resolveCategorySlugFromRequest();
+        if (!empty($resolvedSlug)) {
+            $candidateSlugs[] = $resolvedSlug;
+        }
+
+        foreach ($candidateSlugs as $currentSlug) {
+            $currentSlug = trim($currentSlug);
+            if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
+                return $currentSlug;
+            }
+        }
+
+        // 某些情况下分类归档对象会携带 categories 列表，但不包含 slug 字段
+        if (!empty($archive->categories)) {
+            foreach ($archive->categories as $category) {
+                if (!empty($category['slug']) && in_array($category['slug'], $protectedSlugs)) {
+                    return $category['slug'];
+                }
+            }
+        }
+
         return null;
     }
     
-    // 如果是单篇文章页面，检查文章所属分类
-    if ($archive->is('single')) {
-        if (!empty($archive->categories)) {
-            foreach ($archive->categories as $category) {
-                if (in_array($category['slug'], $protectedSlugs)) {
-                    return $category['slug'];
-                }
+    // 检查文章所属分类（在列表页和文章页都需要检测，避免摘要泄露）
+    if (!empty($archive->categories)) {
+        foreach ($archive->categories as $category) {
+            if (in_array($category['slug'], $protectedSlugs)) {
+                return $category['slug'];
             }
         }
     }
@@ -710,9 +801,10 @@ function printExcerpt($archive, $length = 140) {
         // 获取配置选项
         $hideFromHome = !empty($options->hideProtectedCategoriesFromHome) && $options->hideProtectedCategoriesFromHome == '1';
         $requireArchivePassword = empty($options->requireCategoryArchivePassword) || $options->requireCategoryArchivePassword == '1';
-        
+
         // 判断是否需要隐藏摘要
-        $shouldHideExcerpt = $hideFromHome || !$requireArchivePassword || !isPasswordVerified($archive);
+        // 需求：如果首页隐藏开启，或分类归档无需密码，则不显示摘要内容
+        $shouldHideExcerpt = $hideFromHome || !$requireArchivePassword;
         
         if ($shouldHideExcerpt) {
             $lang = $options->languageSetting;
