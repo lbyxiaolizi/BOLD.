@@ -890,8 +890,11 @@ function getPostViews($archive) {
     $cid    = $archive->cid;
     $db     = Typecho_Db::get();
     $prefix = $db->getPrefix();
-    if (!array_key_exists('views', $db->fetchRow($db->select()->from('table.contents')))) {
-        $db->query('ALTER TABLE `' . $prefix . 'contents` ADD `views` INT(10) DEFAULT 0;');
+    $testRow = $db->fetchRow($db->select()->from('table.contents')->limit(1));
+    if (empty($testRow) || !array_key_exists('views', $testRow)) {
+        if (!empty($testRow)) {
+            $db->query('ALTER TABLE `' . $prefix . 'contents` ADD `views` INT(10) DEFAULT 0;');
+        }
         echo 0; return;
     }
     $row = $db->fetchRow($db->select('views')->from('table.contents')->where('cid = ?', $cid));
@@ -947,15 +950,27 @@ function getRelatedPosts($archive, $limit = 3) {
     $options = Typecho_Widget::widget('Widget_Options');
     $siteUrl = rtrim($options->siteUrl ?? '', '/');
 
-    // 查询：通过 relationships 找到同 tag 的文章，去重 contents.cid，按创建时间倒序
+    // 第一步：通过 relationships 查出同 tag 的文章 cid（去重）
+    $relRows = $db->fetchAll($db->select('DISTINCT cid')->from('table.relationships')
+        ->where('mid IN ?', $tagIds));
+    $relatedCids = array();
+    foreach ($relRows as $r) {
+        if (isset($r['cid']) && $r['cid'] != $archive->cid) {
+            $relatedCids[] = intval($r['cid']);
+        }
+    }
+
+    if (empty($relatedCids)) {
+        echo '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">暂无相关推荐，看看别的吧。</li>';
+        return;
+    }
+
+    // 第二步：从 contents 表查询这些文章的详情
     $select = $db->select()->from('table.contents')
-        ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-        ->where('table.relationships.mid IN ?', $tagIds)
-        ->where('table.contents.cid != ?', $archive->cid)
-        ->where('table.contents.type = ?', 'post')
-        ->where('table.contents.status = ?', 'publish')
-        ->group('table.contents.cid')
-        ->order('table.contents.created', Typecho_Db::SORT_DESC)
+        ->where('cid IN ?', $relatedCids)
+        ->where('type = ?', 'post')
+        ->where('status = ?', 'publish')
+        ->order('created', Typecho_Db::SORT_DESC)
         ->limit($limit);
 
     $related = $db->fetchAll($select);
