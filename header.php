@@ -20,7 +20,18 @@
     <?php endif; ?>
 
     <!-- Canonical URL (SEO 核心: 规范化链接) -->
-    <link rel="canonical" href="<?php $this->permalink(); ?>" />
+    <?php
+    // 安全获取当前页面 URL（permalink() 在空归档页会触发致命错误）
+    if ($this->is('post') || $this->is('page')) {
+        ob_start();
+        $this->permalink();
+        $_boldCurrentUrl = ob_get_clean();
+    } else {
+        $_boldCurrentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+            . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    }
+    ?>
+    <link rel="canonical" href="<?php echo $_boldCurrentUrl; ?>" />
 
     <!-- RSS & Atom Feeds (博客标配: 订阅源) -->
     <link rel="alternate" type="application/rss+xml" title="<?php $this->options->title(); ?> &raquo; RSS 2.0" href="<?php $this->options->feedUrl(); ?>" />
@@ -34,12 +45,14 @@
     <!-- Open Graph / Twitter Card (社交分享优化) -->
     <meta property="og:site_name" content="<?php $this->options->title(); ?>" />
     <meta property="og:type" content="<?php echo $this->is('post') ? 'article' : 'website'; ?>" />
-    <meta property="og:url" content="<?php $this->permalink(); ?>" />
+    <meta property="og:url" content="<?php echo $_boldCurrentUrl; ?>" />
     <meta property="og:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />
     <meta property="og:description" content="<?php echo get_seo_description($this); ?>" />
     <meta property="og:image" content="<?php echo get_og_image($this); ?>" />
+    <?php if ($this->is('post') || $this->is('page')): ?>
     <meta property="article:published_time" content="<?php $this->date('c'); ?>" />
     <meta property="article:modified_time" content="<?php echo date('c', $this->modified); ?>" />
+    <?php endif; ?>
     
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />

@@ -24,6 +24,7 @@ $hoverColors = [
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col dark:border-[#10b981]">
     
     <div>
+        <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
         <?php 
             // 如果文章属于加密分类且设置了隐藏，跳过不显示
@@ -62,13 +63,18 @@ $hoverColors = [
             </div>
         </article>
         <?php endwhile; ?>
+        <?php else: ?>
+            <div class="p-10 text-xl font-bold dark:text-white">没有找到内容</div>
+        <?php endif; ?>
     </div>
 
+    <?php if ($this->getTotal() > 0): ?>
     <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">
         <?php $this->pageLink('← 上一页', 'prev'); ?>
         <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black">PAGE <?php if($this->_currentPage>1) echo $this->_currentPage;  else echo 1;?> / <?php echo ceil($this->getTotal() / $this->parameter->pageSize); ?></span>
         <?php $this->pageLink('下一页 →', 'next'); ?>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php $this->need('sidebar.php'); ?>
