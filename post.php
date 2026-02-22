@@ -59,7 +59,7 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
                     <div class="flex flex-col gap-2 text-center md:text-left w-full md:w-auto">
                         <div class="text-xs font-bold text-gray-600 dark:text-gray-400">
                             <p>本文由 <span class="text-black dark:text-white"><?php $this->author(); ?></span> 原创</p>
-                            <p>采用 <a href="http://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" class="underline hover:text-pink-600 dark:hover:text-[#10b981]">CC BY-NC-SA 4.0</a> 协议进行许可</p>
+                            <p>采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" class="underline hover:text-pink-600 dark:hover:text-[#10b981]">CC BY-NC-SA 4.0</a> 协议进行许可</p>
                             <p>转载请注明出处：<a href="<?php $this->permalink(); ?>" class="underline hover:text-pink-600 dark:hover:text-[#10b981]"><?php $this->permalink(); ?></a></p>
                         </div>
                     </div>

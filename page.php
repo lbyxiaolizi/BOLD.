@@ -23,7 +23,7 @@
                         <?php endif; ?>
                     </div>
                     <div class="text-center md:text-left flex-grow">
-                        <h3 class="text-2xl font-black uppercase mb-2">lbyxiaolizi</h3>
+                        <h3 class="text-2xl font-black uppercase mb-2"><?php $this->options->AuthorName(); ?></h3>
                         <p class="font-bold text-gray-700 mb-4"><?php $this->options->descriptions(); ?></p>
                         <div class="flex flex-wrap gap-3 justify-center md:justify-start">
                              <?php if ($this->options->githubLink): ?>

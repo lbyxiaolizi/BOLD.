@@ -18,6 +18,8 @@ function themeConfig($form) {
     $faviconUrl = new Typecho_Widget_Helper_Form_Element_Text('faviconUrl', NULL, NULL, _t('Favicon 图标 URL'), _t('浏览器标签页图标，留空则不显示'));
     $form->addInput($faviconUrl);
 
+    $AuthorName = new Typecho_Widget_Helper_Form_Element_Text('AuthorName', NULL, NULL, _t('作者名称'), _t('作者名称'));
+    $form->addInput($AuthorName);
 
     $avatarUrl = new Typecho_Widget_Helper_Form_Element_Text('avatarUrl', NULL, NULL, _t('个人头像 URL'), _t('输入头像图片的地址，将显示在侧边栏或个人卡片中'));
     $form->addInput($avatarUrl);

@@ -2,9 +2,9 @@
 /**
  * BOLD - 一款简洁大胆的新粗野主义 (Neo-Brutalism) 风格主题
  * * @package BOLD Theme
- * @author YourName
- * @version 1.0
- * @link http://yourwebsite.com
+ * @author lbyxiaolizi
+ * @version 1.2
+ * @link https://blog.vh.gs
  */
 
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
