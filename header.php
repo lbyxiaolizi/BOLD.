@@ -549,6 +549,48 @@
                 padding: 0.875rem !important;
             }
         }
+
+        /* Mermaid 图表 */
+        .prose .mermaid-wrapper {
+            margin: 2rem 0 !important;
+            padding: 1rem;
+            max-width: 100%;
+            overflow-x: auto;
+            background: #fff;
+            border: 4px solid #000;
+            box-shadow: 8px 8px 0px 0px #000;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .prose .mermaid {
+            min-width: min-content;
+            text-align: center;
+        }
+
+        .prose .mermaid svg {
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .dark-mode .prose .mermaid-wrapper {
+            background: #121212;
+            border-color: var(--border-color);
+            box-shadow: 8px 8px 0px 0px var(--border-color);
+        }
+
+        @media (max-width: 767px) {
+            .prose .mermaid-wrapper {
+                margin-left: -1rem !important;
+                margin-right: -1rem !important;
+                padding: 0.75rem;
+                box-shadow: 6px 6px 0px 0px #000;
+            }
+
+            .dark-mode .prose .mermaid-wrapper {
+                box-shadow: 6px 6px 0px 0px var(--border-color);
+            }
+        }
         
         /* 输入框 */
         .dark-mode input, .dark-mode textarea { 

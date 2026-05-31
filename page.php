@@ -42,7 +42,11 @@
                 </div>
             </div>
 
-            <?php $this->content(); ?>
+            <?php
+                ob_start();
+                $this->content();
+                echo parseMermaidContent(ob_get_clean());
+            ?>
         </div>
     </article>
     <?php $this->need('comments.php'); ?>

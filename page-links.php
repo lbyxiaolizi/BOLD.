@@ -110,7 +110,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
                 $replacement2 = '<li><a href="$1" target="_blank"><span class="link-title">$2</span><span class="link-desc"></span></a></li>';
                 $content = preg_replace($pattern2, $replacement2, $content);
                 
-                echo $content;
+                echo parseMermaidContent($content);
             ?>
         </div>
     </article>

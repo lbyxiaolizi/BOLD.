@@ -760,6 +760,59 @@ function parseInlinePasswordContent($content, $archive) {
 }
 
 /**
+ * 将 Markdown 渲染后的 mermaid 代码块转换为 Mermaid 可识别的容器
+ */
+function parseMermaidContent($content) {
+    if (!is_string($content) || stripos($content, 'mermaid') === false) {
+        return $content;
+    }
+
+    // 兼容内容尚未经过 Markdown 渲染时的 fenced code block。
+    $content = preg_replace_callback('/(^|\n)```mermaid[ \t]*\r?\n(.*?)\r?\n```/is', function ($matches) {
+        return $matches[1] . renderMermaidBlock($matches[2]);
+    }, $content);
+
+    // Typecho Markdown 通常会输出 <pre><code class="language-mermaid">...</code></pre>。
+    return preg_replace_callback('/<pre\b[^>]*>\s*<code\b([^>]*)>(.*?)<\/code>\s*<\/pre>/is', function ($matches) {
+        $codeAttributes = $matches[1];
+        $code = $matches[2];
+
+        if (!preg_match('/class\s*=\s*(["\'])(.*?)\1/i', $codeAttributes, $classMatch)) {
+            return $matches[0];
+        }
+
+        $classes = preg_split('/\s+/', trim($classMatch[2]));
+        $isMermaid = false;
+        foreach ($classes as $className) {
+            if (in_array(strtolower($className), array('mermaid', 'language-mermaid', 'lang-mermaid'), true)) {
+                $isMermaid = true;
+                break;
+            }
+        }
+
+        if (!$isMermaid) {
+            return $matches[0];
+        }
+
+        return renderMermaidBlock(html_entity_decode($code, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }, $content);
+}
+
+/**
+ * 输出 Mermaid 图表外壳，内容保持转义，交由前端 Mermaid 渲染。
+ */
+function renderMermaidBlock($diagramCode) {
+    $diagramCode = trim((string) $diagramCode);
+    if ($diagramCode === '') {
+        return '';
+    }
+
+    return '<div class="not-prose mermaid-wrapper"><div class="mermaid" aria-label="Mermaid diagram">'
+        . htmlspecialchars($diagramCode, ENT_NOQUOTES, 'UTF-8')
+        . '</div></div>';
+}
+
+/**
  * 检查文章是否应该从首页隐藏（属于加密分类且设置了隐藏）
  * @param object $archive 文章对象
  * @return bool 返回true表示应该隐藏

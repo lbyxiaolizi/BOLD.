@@ -122,6 +122,68 @@ if (typeof Prism !== 'undefined' && Prism.plugins && Prism.plugins.autoloader) {
 MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache: 'global' } };
 </script>
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+(function() {
+    function isDarkMode() {
+        return document.documentElement.classList.contains('dark-mode');
+    }
+
+    function getMermaidConfig() {
+        var dark = isDarkMode();
+        return {
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: dark ? 'dark' : 'base',
+            themeVariables: dark ? {
+                background: '#121212',
+                primaryColor: '#10b981',
+                primaryBorderColor: '#10b981',
+                primaryTextColor: '#000000',
+                lineColor: '#10b981',
+                textColor: '#e5e5e5',
+                mainBkg: '#1e1e1e',
+                nodeBorder: '#10b981',
+                clusterBkg: '#121212',
+                clusterBorder: '#10b981',
+                fontFamily: 'Noto Sans SC, sans-serif'
+            } : {
+                background: '#ffffff',
+                primaryColor: '#fef08a',
+                primaryBorderColor: '#000000',
+                primaryTextColor: '#000000',
+                lineColor: '#000000',
+                textColor: '#111827',
+                mainBkg: '#ffffff',
+                nodeBorder: '#000000',
+                clusterBkg: '#f8f8f8',
+                clusterBorder: '#000000',
+                fontFamily: 'Noto Sans SC, sans-serif'
+            }
+        };
+    }
+
+    window.renderBoldMermaid = function() {
+        if (typeof mermaid === 'undefined') return;
+
+        var diagrams = Array.prototype.slice.call(document.querySelectorAll('.mermaid'));
+        if (!diagrams.length) return;
+
+        diagrams.forEach(function(diagram) {
+            if (!diagram.dataset.mermaidSource) {
+                diagram.dataset.mermaidSource = diagram.textContent.trim();
+            }
+            diagram.removeAttribute('data-processed');
+            diagram.textContent = diagram.dataset.mermaidSource;
+        });
+
+        mermaid.initialize(getMermaidConfig());
+        mermaid.run({ nodes: diagrams }).catch(function(error) {
+            console.error('Mermaid render failed:', error);
+        });
+    };
+})();
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -164,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     if (typeof ViewImage !== 'undefined') { ViewImage.init('.prose img'); }
+    if (typeof window.renderBoldMermaid === 'function') { window.renderBoldMermaid(); }
 
     // 外链安全
     var links = document.links;
@@ -235,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem('darkMode', newMode);
             if (typeof applyTheme === 'function') { applyTheme(); }
             updateIcons();
+            if (typeof window.renderBoldMermaid === 'function') { window.renderBoldMermaid(); }
         });
     }
 });
