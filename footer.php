@@ -215,14 +215,138 @@ document.addEventListener('DOMContentLoaded', function() {
     backToTopBtn && backToTopBtn.addEventListener('click', function() { window.scrollTo({ top: 0, behavior: 'smooth' }); });
 
     // TOC & 图片灯箱
+    function getDirectChild(element, matcher) {
+        var children = element.children || [];
+        for (var i = 0; i < children.length; i++) {
+            if (matcher(children[i])) return children[i];
+        }
+        return null;
+    }
+
+    function getTocHeadingLevel(link) {
+        var className = link.className || '';
+        var classMatch = className.match(/node-name--H([1-6])/i);
+        if (classMatch) return parseInt(classMatch[1], 10);
+
+        if (link.hash) {
+            try {
+                var target = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+                if (target && /^H[1-6]$/i.test(target.tagName)) {
+                    return parseInt(target.tagName.slice(1), 10);
+                }
+            } catch (error) {}
+        }
+
+        return 0;
+    }
+
+    function setTocToggleState(button, item, collapsed) {
+        var label = button.getAttribute('data-toc-title') || '';
+        item.classList.toggle('is-toc-collapsed', collapsed);
+        button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        button.setAttribute('aria-label', (collapsed ? '展开：' : '折叠：') + label);
+    }
+
+    function clampTocScroll(scrollElement) {
+        if (!scrollElement) return;
+
+        var maxScrollTop = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+        if (scrollElement.scrollTop < 0) scrollElement.scrollTop = 0;
+        if (scrollElement.scrollTop > maxScrollTop) scrollElement.scrollTop = maxScrollTop;
+    }
+
+    function bindTocScrollLimit(scrollElement) {
+        if (!scrollElement || scrollElement.dataset.scrollLimitBound === 'true') return;
+        scrollElement.dataset.scrollLimitBound = 'true';
+
+        scrollElement.addEventListener('scroll', function() {
+            clampTocScroll(scrollElement);
+        });
+
+        scrollElement.addEventListener('wheel', function(event) {
+            var maxScrollTop = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+            var atTop = scrollElement.scrollTop <= 0;
+            var atBottom = scrollElement.scrollTop >= maxScrollTop;
+
+            if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+    }
+
+    function resetTocbotCollapseState(tocContainer) {
+        var collapsedLists = tocContainer.querySelectorAll('.is-collapsible, .is-collapsed');
+        for (var i = 0; i < collapsedLists.length; i++) {
+            collapsedLists[i].classList.remove('is-collapsible', 'is-collapsed');
+            collapsedLists[i].style.maxHeight = '';
+        }
+    }
+
+    function initTocCollapse(tocContainer) {
+        if (!tocContainer) return;
+        resetTocbotCollapseState(tocContainer);
+
+        var tocItems = tocContainer.querySelectorAll('.toc-list-item');
+        for (var i = 0; i < tocItems.length; i++) {
+            var item = tocItems[i];
+            var link = getDirectChild(item, function(child) {
+                return child.classList && child.classList.contains('toc-link');
+            });
+            if (!link) continue;
+
+            var level = getTocHeadingLevel(link);
+            if (level < 1 || level > 3) continue;
+
+            var childList = getDirectChild(item, function(child) {
+                return child.classList && child.classList.contains('toc-list');
+            });
+
+            if (!childList) {
+                var placeholder = document.createElement('span');
+                placeholder.className = 'toc-toggle-placeholder';
+                placeholder.setAttribute('aria-hidden', 'true');
+                item.insertBefore(placeholder, link);
+                continue;
+            }
+
+            if (!childList.id) childList.id = 'toc-children-' + i;
+
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'toc-toggle';
+            button.setAttribute('aria-controls', childList.id);
+            button.setAttribute('data-toc-title', link.textContent.trim());
+            setTocToggleState(button, item, false);
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                var currentButton = event.currentTarget;
+                var currentItem = currentButton.parentElement;
+                var isCollapsed = currentItem.classList.contains('is-toc-collapsed');
+                setTocToggleState(currentButton, currentItem, !isCollapsed);
+                clampTocScroll(currentButton.closest('.toc-container'));
+            });
+
+            item.insertBefore(button, link);
+        }
+    }
+
     var content = document.querySelector('.prose');
     if (content) {
-        var headers = content.querySelectorAll('h2, h3');
+        var headingSelector = 'h1, h2, h3, h4, h5';
+        var headers = content.querySelectorAll(headingSelector);
         if (headers.length > 0) {
             var tocWrapper = document.getElementById('toc-wrapper');
             if(tocWrapper) tocWrapper.classList.remove('hidden');
             headers.forEach(function(header, index) { if (!header.id) { header.id = 'section-' + index; } });
-            tocbot.init({ tocSelector: '.toc-container', contentSelector: '.prose', headingSelector: 'h2, h3', hasInnerContainers: true, scrollSmooth: true, scrollSmoothDuration: 400, headingsOffset: 80, scrollSmoothOffset: -80 });
+            if (typeof tocbot !== 'undefined') {
+                tocbot.init({ tocSelector: '.toc-container', contentSelector: '.prose', headingSelector: headingSelector, hasInnerContainers: true, collapseDepth: 6, scrollSmooth: true, scrollSmoothDuration: 400, headingsOffset: 80, scrollSmoothOffset: -80 });
+                var tocContainer = document.querySelector('.toc-container');
+                initTocCollapse(tocContainer);
+                bindTocScrollLimit(tocContainer);
+                clampTocScroll(tocContainer);
+            }
         }
     }
     if (typeof ViewImage !== 'undefined') { ViewImage.init('.prose img'); }

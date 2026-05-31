@@ -625,7 +625,96 @@
         .hover-underline-animation:hover::after { transform: scaleX(1); transform-origin: bottom left; }
         
         /* TOC Active Link */
-        .dark-mode .is-active-link { background: var(--accent-color); color: #000 !important; box-shadow: 4px 4px 0px 0px #fff; }
+        .toc-container .toc-list {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .toc-container .toc-list .toc-list {
+            margin-top: 0.35rem;
+            padding-left: 1.15rem;
+            border-left: 2px solid var(--border-color);
+        }
+
+        .toc-container .toc-list-item {
+            margin: 0.25rem 0;
+        }
+
+        .toc-container .toc-link {
+            display: inline-block;
+            max-width: calc(100% - 1.75rem);
+            padding: 0.2rem 0.35rem;
+            color: var(--text-main);
+            line-height: 1.35;
+            text-decoration: none;
+            word-break: break-word;
+        }
+
+        .toc-container .toc-link:hover,
+        .toc-container .is-active-link {
+            background: var(--accent-color);
+            color: #fff !important;
+            box-shadow: 3px 3px 0px 0px var(--border-color);
+        }
+
+        .toc-container .toc-toggle {
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-right: 0.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: top;
+            border: 2px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-main);
+            cursor: pointer;
+            transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+        }
+
+        .toc-container .toc-toggle::before {
+            content: '';
+            width: 0;
+            height: 0;
+            border-top: 0.28rem solid transparent;
+            border-bottom: 0.28rem solid transparent;
+            border-left: 0.42rem solid currentColor;
+            transform: rotate(90deg);
+            transform-origin: center;
+            transition: transform 0.18s ease;
+        }
+
+        .toc-container .toc-toggle:hover {
+            background: var(--accent-color);
+            color: #fff;
+        }
+
+        .toc-container .toc-toggle-placeholder {
+            width: 1.25rem;
+            margin-right: 0.25rem;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        .toc-container .toc-list.is-collapsible,
+        .toc-container .toc-list.is-collapsed {
+            max-height: none;
+            overflow: hidden;
+        }
+
+        .toc-container .toc-list-item.is-toc-collapsed > .toc-list {
+            display: none;
+            max-height: 0;
+            overflow: hidden;
+        }
+
+        .toc-container .toc-list-item.is-toc-collapsed > .toc-toggle::before {
+            transform: rotate(0deg);
+        }
+
+        .dark-mode .toc-container .toc-link:hover,
+        .dark-mode .toc-container .is-active-link { background: var(--accent-color); color: #000 !important; box-shadow: 4px 4px 0px 0px #fff; }
 
         /* --- TOC Sticky (目录悬浮) --- */
         #toc-wrapper {
@@ -633,12 +722,18 @@
             position: sticky;
             top: 160px; /* 避开顶部导航栏的高度 */
             z-index: 30;
-            max-height: calc(100vh - 180px);
+            background-color: var(--bg-card);
+        }
+
+        .toc-container {
+            max-height: min(420px, calc(100vh - 260px));
             overflow-y: auto;
-            background-color: var(--bg-card); 
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            padding-right: 0.25rem;
             scrollbar-width: none;
         }
-        #toc-wrapper::-webkit-scrollbar { display: none; }
+        .toc-container::-webkit-scrollbar { display: none; }
     </style>
     
     <script>
