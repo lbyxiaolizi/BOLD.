@@ -722,14 +722,18 @@
             position: sticky;
             top: 160px; /* 避开顶部导航栏的高度 */
             z-index: 30;
-            max-height: calc(100vh - 180px);
+            background-color: var(--bg-card);
+        }
+
+        .toc-container {
+            max-height: min(420px, calc(100vh - 260px));
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
-            background-color: var(--bg-card); 
+            padding-right: 0.25rem;
             scrollbar-width: none;
         }
-        #toc-wrapper::-webkit-scrollbar { display: none; }
+        .toc-container::-webkit-scrollbar { display: none; }
     </style>
     
     <script>
