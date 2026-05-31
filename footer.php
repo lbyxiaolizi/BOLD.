@@ -247,6 +247,33 @@ document.addEventListener('DOMContentLoaded', function() {
         button.setAttribute('aria-label', (collapsed ? '展开：' : '折叠：') + label);
     }
 
+    function clampTocScroll(tocWrapper) {
+        if (!tocWrapper) return;
+
+        var maxScrollTop = Math.max(0, tocWrapper.scrollHeight - tocWrapper.clientHeight);
+        if (tocWrapper.scrollTop < 0) tocWrapper.scrollTop = 0;
+        if (tocWrapper.scrollTop > maxScrollTop) tocWrapper.scrollTop = maxScrollTop;
+    }
+
+    function bindTocScrollLimit(tocWrapper) {
+        if (!tocWrapper || tocWrapper.dataset.scrollLimitBound === 'true') return;
+        tocWrapper.dataset.scrollLimitBound = 'true';
+
+        tocWrapper.addEventListener('scroll', function() {
+            clampTocScroll(tocWrapper);
+        });
+
+        tocWrapper.addEventListener('wheel', function(event) {
+            var maxScrollTop = Math.max(0, tocWrapper.scrollHeight - tocWrapper.clientHeight);
+            var atTop = tocWrapper.scrollTop <= 0;
+            var atBottom = tocWrapper.scrollTop >= maxScrollTop;
+
+            if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+    }
+
     function resetTocbotCollapseState(tocContainer) {
         var collapsedLists = tocContainer.querySelectorAll('.is-collapsible, .is-collapsed');
         for (var i = 0; i < collapsedLists.length; i++) {
@@ -298,6 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var currentItem = currentButton.parentElement;
                 var isCollapsed = currentItem.classList.contains('is-toc-collapsed');
                 setTocToggleState(currentButton, currentItem, !isCollapsed);
+                clampTocScroll(document.getElementById('toc-wrapper'));
             });
 
             item.insertBefore(button, link);
@@ -315,6 +343,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof tocbot !== 'undefined') {
                 tocbot.init({ tocSelector: '.toc-container', contentSelector: '.prose', headingSelector: headingSelector, hasInnerContainers: true, collapseDepth: 6, scrollSmooth: true, scrollSmoothDuration: 400, headingsOffset: 80, scrollSmoothOffset: -80 });
                 initTocCollapse(document.querySelector('.toc-container'));
+                bindTocScrollLimit(tocWrapper);
+                clampTocScroll(tocWrapper);
             }
         }
     }

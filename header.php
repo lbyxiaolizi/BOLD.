@@ -700,7 +700,7 @@
         .toc-container .toc-list.is-collapsible,
         .toc-container .toc-list.is-collapsed {
             max-height: none;
-            overflow: visible;
+            overflow: hidden;
         }
 
         .toc-container .toc-list-item.is-toc-collapsed > .toc-list {
@@ -724,6 +724,8 @@
             z-index: 30;
             max-height: calc(100vh - 180px);
             overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
             background-color: var(--bg-card); 
             scrollbar-width: none;
         }
