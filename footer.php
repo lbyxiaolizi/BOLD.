@@ -247,8 +247,17 @@ document.addEventListener('DOMContentLoaded', function() {
         button.setAttribute('aria-label', (collapsed ? '展开：' : '折叠：') + label);
     }
 
+    function resetTocbotCollapseState(tocContainer) {
+        var collapsedLists = tocContainer.querySelectorAll('.is-collapsible, .is-collapsed');
+        for (var i = 0; i < collapsedLists.length; i++) {
+            collapsedLists[i].classList.remove('is-collapsible', 'is-collapsed');
+            collapsedLists[i].style.maxHeight = '';
+        }
+    }
+
     function initTocCollapse(tocContainer) {
         if (!tocContainer) return;
+        resetTocbotCollapseState(tocContainer);
 
         var tocItems = tocContainer.querySelectorAll('.toc-list-item');
         for (var i = 0; i < tocItems.length; i++) {
@@ -304,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if(tocWrapper) tocWrapper.classList.remove('hidden');
             headers.forEach(function(header, index) { if (!header.id) { header.id = 'section-' + index; } });
             if (typeof tocbot !== 'undefined') {
-                tocbot.init({ tocSelector: '.toc-container', contentSelector: '.prose', headingSelector: headingSelector, hasInnerContainers: true, collapseDepth: 0, scrollSmooth: true, scrollSmoothDuration: 400, headingsOffset: 80, scrollSmoothOffset: -80 });
+                tocbot.init({ tocSelector: '.toc-container', contentSelector: '.prose', headingSelector: headingSelector, hasInnerContainers: true, collapseDepth: 6, scrollSmooth: true, scrollSmoothDuration: 400, headingsOffset: 80, scrollSmoothOffset: -80 });
                 initTocCollapse(document.querySelector('.toc-container'));
             }
         }

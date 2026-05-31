@@ -697,8 +697,16 @@
             vertical-align: top;
         }
 
+        .toc-container .toc-list.is-collapsible,
+        .toc-container .toc-list.is-collapsed {
+            max-height: none;
+            overflow: visible;
+        }
+
         .toc-container .toc-list-item.is-toc-collapsed > .toc-list {
             display: none;
+            max-height: 0;
+            overflow: hidden;
         }
 
         .toc-container .toc-list-item.is-toc-collapsed > .toc-toggle::before {
