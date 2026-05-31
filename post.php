@@ -49,6 +49,7 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
                 $content = $this->content;
                 $content = parseInlinePasswordContent($content, $this);
                 $content = parseReplyContent($content, $this);
+                $content = parseMermaidContent($content);
                 echo $content;
             ?>
         </div>
