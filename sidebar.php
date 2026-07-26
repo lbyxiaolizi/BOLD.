@@ -1,26 +1,27 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <aside class="w-full md:w-1/3 bg-white">
-    
+
     <!-- 1. 个人简介 (仅当配置了头像URL时显示) -->
     <?php if ($this->options->avatarUrl): ?>
+    <?php $sidebarAuthor = $this->options->sidebarAuthorName ?: $this->options->AuthorName; ?>
     <div class="p-6 md:p-10 border-b-4 border-black bg-yellow-50">
         <div class="flex flex-col items-center text-center">
             <div class="w-24 h-24 border-4 border-black overflow-hidden shadow-[4px_4px_0px_0px_#000] mb-4">
-                <img src="<?php $this->options->avatarUrl(); ?>" alt="Avatar" class="w-full h-full object-cover">
+                <img src="<?php $this->options->avatarUrl(); ?>" alt="<?php echo htmlspecialchars(strval($sidebarAuthor), ENT_QUOTES, 'UTF-8', false); ?>" loading="lazy" decoding="async" class="w-full h-full object-cover">
             </div>
-            <h3 class="font-black text-xl uppercase mb-2"><?php $this->options->AuthorName(); ?></h3>
-            <p class="font-bold text-sm text-gray-700 mb-4"><?php $this->options->description(); ?></p>
-            
+            <h3 class="font-black text-xl uppercase mb-2"><?php echo $sidebarAuthor; ?></h3>
+            <p class="font-bold text-sm text-gray-700 mb-4"><?php $this->options->descriptions(); ?></p>
+
             <div class="flex gap-3">
                 <?php if ($this->options->githubLink): ?>
-                <a href="<?php $this->options->githubLink(); ?>" target="_blank" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
+                <a href="<?php $this->options->githubLink(); ?>" target="_blank" rel="noopener" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-blue-400 hover:text-white transition-colors no-underline">GitHub</a>
                 <?php endif; ?>
-                
+
                 <?php if ($this->options->bilibiliLink): ?>
-                <a href="<?php $this->options->bilibiliLink(); ?>" target="_blank" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-pink-400 transition-colors no-underline">Bilibili</a>
+                <a href="<?php $this->options->bilibiliLink(); ?>" target="_blank" rel="noopener" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-pink-400 transition-colors no-underline">Bilibili</a>
                 <?php endif; ?>
                 <?php if ($this->options->email): ?>
-                                <a href="<?php $this->options->email(); ?>" target="_blank" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-yellow-400 transition-colors no-underline">Email</a>
+                <a href="<?php echo htmlspecialchars(bold_mailto($this->options->email), ENT_QUOTES, 'UTF-8'); ?>" class="bg-white text-black border-2 border-black px-5 py-2 font-bold hover:bg-yellow-400 transition-colors no-underline">Email</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -31,22 +32,22 @@
     <?php if ($this->is('post') || $this->is('page')): ?>
     <div id="toc-wrapper" class="p-6 md:p-10 border-b-4 border-black hidden">
         <h3 class="font-black text-xl mb-4 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-pink-500 border-2 border-black"></div> <?php echo get_theme_text('toc', $this); ?>
+            <div class="w-4 h-4 bg-pink-500 border-2 border-black" aria-hidden="true"></div> <?php echo get_theme_text('toc', $this); ?>
         </h3>
         <!-- 目录内容生成于此 -->
-        <div class="toc-container font-bold text-sm"></div>
+        <nav class="toc-container font-bold text-sm" aria-label="<?php echo get_theme_text('toc', $this); ?>"></nav>
     </div>
     <?php endif; ?>
 
     <!-- 3. 搜索 -->
     <div class="p-6 md:p-10 border-b-4 border-black">
         <h3 class="font-black text-xl mb-4 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-yellow-400 border-2 border-black"></div> <?php echo get_theme_text('search', $this); ?>
+            <div class="w-4 h-4 bg-yellow-400 border-2 border-black" aria-hidden="true"></div> <?php echo get_theme_text('search', $this); ?>
         </h3>
         <form method="post" action="<?php $this->options->siteUrl(); ?>" role="search" class="flex border-4 border-black focus-within:ring-4 ring-pink-400 transition-all shadow-none md:shadow-[4px_4px_0px_0px_#000]">
-            <input type="text" name="s" placeholder="输入关键词..." class="w-full p-3 font-bold focus:outline-none bg-white placeholder-gray-400 text-black">
-            <button type="submit" class="bg-black text-white px-4 hover:bg-pink-500 hover:text-white transition-colors border-l-4 border-black">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" name="s" placeholder="<?php echo get_theme_text('search_placeholder', $this); ?>" aria-label="<?php echo get_theme_text('search', $this); ?>" class="w-full p-3 font-bold focus:outline-none bg-white placeholder-gray-400 text-black">
+            <button type="submit" aria-label="<?php echo get_theme_text('search', $this); ?>" class="bg-black text-white px-4 hover:bg-pink-500 hover:text-white transition-colors border-l-4 border-black">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </button>
         </form>
     </div>
@@ -54,7 +55,7 @@
     <!-- 4. 分类 -->
     <div class="p-6 md:p-10 border-b-4 border-black">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-cyan-400 border-2 border-black"></div> <?php echo get_theme_text('categories', $this); ?>
+            <div class="w-4 h-4 bg-cyan-400 border-2 border-black" aria-hidden="true"></div> <?php echo get_theme_text('categories', $this); ?>
         </h3>
         <ul class="space-y-3 font-bold text-lg">
             <?php $this->widget('Widget_Metas_Category_List')->to($category); ?>
@@ -65,14 +66,14 @@
             <?php endwhile; ?>
         </ul>
     </div>
-    <!-- 5. 标签云 (修正版: 动态字号) -->
+    <!-- 5. 标签云 (动态字号) -->
     <div class="p-6 md:p-10 border-b-4 border-black dark:border-[#10b981]">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2 dark:text-white">
-            <div class="w-4 h-4 bg-orange-500 border-2 border-black dark:border-[#10b981] dark:bg-[#10b981]"></div> <?php echo get_theme_text('tags', $this); ?>
+            <div class="w-4 h-4 bg-orange-500 border-2 border-black dark:border-[#10b981] dark:bg-[#10b981]" aria-hidden="true"></div> <?php echo get_theme_text('tags', $this); ?>
         </h3>
         <div class="flex flex-wrap gap-2 items-end">
-            <?php 
-            $this->widget('Widget_Metas_Tag_Cloud', 'sort=count&ignoreZeroCount=1&desc=1&limit=50')->to($tags); 
+            <?php
+            $this->widget('Widget_Metas_Tag_Cloud', 'sort=count&ignoreZeroCount=1&desc=1&limit=50')->to($tags);
             $tag_list = array();
             while ($tags->next()) {
                 $tag_list[] = array(
@@ -81,41 +82,50 @@
                     'count' => $tags->count
                 );
             }
-            
+
             if (!empty($tag_list)) {
                 $counts = array_column($tag_list, 'count');
                 $max_count = max($counts);
                 $min_count = min($counts);
                 $spread = $max_count - $min_count;
                 if ($spread <= 0) $spread = 1;
-                
+
                 foreach ($tag_list as $tag) {
-                    // 修复：字号范围调整为 0.75rem ~ 1.1rem (约 12px ~ 17.6px)
+                    // 字号范围 0.75rem ~ 1.1rem (约 12px ~ 17.6px)
                     $size = 0.75 + (($tag['count'] - $min_count) / $spread) * 0.35;
-                    
-                    echo '<a href="'.$tag['permalink'].'" style="font-size: '.$size.'rem; line-height: 1.2;" class="inline-block px-2 py-1 border-2 border-black bg-white font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all dark:bg-[#1e1e1e] dark:border-[#10b981] dark:text-white dark:shadow-[2px_2px_0px_0px_#10b981] hover:bg-orange-100 dark:hover:bg-[#2d2d2d] no-underline">';
-                    echo $tag['name'];
+
+                    echo '<a href="'.htmlspecialchars($tag['permalink'], ENT_QUOTES, 'UTF-8').'" style="font-size: '.$size.'rem; line-height: 1.2;" class="inline-block px-2 py-1 border-2 border-black bg-white font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all dark:bg-[#1e1e1e] dark:border-[#10b981] dark:text-white dark:shadow-[2px_2px_0px_0px_#10b981] hover:bg-orange-100 dark:hover:bg-[#2d2d2d] no-underline">';
+                    echo htmlspecialchars($tag['name'], ENT_QUOTES, 'UTF-8', false);
                     echo '</a>';
                 }
             } else {
-                echo '<span class="text-gray-500 font-bold dark:text-gray-400">暂无标签</span>';
+                echo '<span class="text-gray-500 font-bold dark:text-gray-400">'.get_theme_text('no_tags', $this).'</span>';
             }
             ?>
         </div>
     </div>
 
-    
+
     <!-- 6. 最新评论 -->
     <div class="p-6 md:p-10">
         <h3 class="font-black text-xl mb-6 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-lime-400 border-2 border-black"></div> <?php echo get_theme_text('comments', $this); ?>
+            <div class="w-4 h-4 bg-lime-400 border-2 border-black" aria-hidden="true"></div> <?php echo get_theme_text('comments', $this); ?>
         </h3>
         <ul class="space-y-6 text-sm font-medium">
             <?php $this->widget('Widget_Comments_Recent')->to($comments); ?>
             <?php while($comments->next()): ?>
+            <?php
+            try {
+                $commentCid = intval($comments->cid ?? 0);
+                $commentIsPublic = $commentCid > 0 && !bold_cid_is_protected($commentCid);
+            } catch (Throwable $e) {
+                $commentIsPublic = false;
+            }
+            if (!$commentIsPublic) continue;
+            ?>
             <li class="group">
                 <a href="<?php $comments->permalink(); ?>" class="block relative">
-                    <div class="absolute -left-3 top-0 bottom-0 w-1 bg-gray-200 group-hover:bg-purple-500 transition-colors"></div>
+                    <div class="absolute -left-3 top-0 bottom-0 w-1 bg-gray-200 group-hover:bg-purple-500 transition-colors" aria-hidden="true"></div>
                     <span class="font-black text-base bg-purple-100 group-hover:bg-purple-500 group-hover:text-white px-2 py-0.5 border-2 border-transparent group-hover:border-black transition-all"><?php $comments->author(false); ?></span>
                     <span class="text-gray-600 block mt-2 group-hover:text-black"><?php $comments->excerpt(35, '...'); ?></span>
                 </a>
