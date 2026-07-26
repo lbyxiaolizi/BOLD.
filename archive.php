@@ -1,6 +1,4 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
-<?php $this->need('header.php'); ?>
-
 <?php
 // 处理分类页密码验证
 $passwordError = false;
@@ -10,12 +8,14 @@ if ($this->is('category')) {
     // 检查是否需要分类归档页密码验证
     $options = Helper::options();
     $requireArchivePassword = empty($options->requireCategoryArchivePassword) || $options->requireCategoryArchivePassword == '1';
-    
+
     if ($requireArchivePassword) {
         $passwordError = handlePasswordVerification($this);
         $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
     }
 }
+
+$this->need('header.php');
 
 $hoverColors = [
     'hover:bg-red-200', 'hover:bg-orange-200', 'hover:bg-amber-200',
@@ -28,7 +28,7 @@ $hoverColors = [
 ?>
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col dark:border-[#10b981]">
-    
+
     <div class="p-6 md:p-10 border-b-4 border-black bg-cyan-400 relative overflow-hidden group dark:bg-[#10b981] dark:border-[#10b981]">
         <span class="inline-block bg-black text-white px-3 py-1 text-xs font-bold uppercase tracking-widest border-2 border-white mb-4 dark:bg-[#121212] dark:border-[#10b981]">Archive</span>
         <h1 class="text-5xl md:text-7xl font-black mb-6 uppercase tracking-tight text-black dark:text-black">
@@ -53,6 +53,9 @@ $hoverColors = [
         <?php $randomHover = $hoverColors[array_rand($hoverColors)]; ?>
         <article class="p-6 md:p-10 border-b-4 border-black transition-colors group cursor-pointer relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <div class="relative z-10">
+                <div class="flex items-center gap-2 mb-3 md:mb-4 text-xs font-bold uppercase tracking-wider flex-wrap">
+                    <time class="bg-white px-2 py-1 border-2 border-black dark:bg-[#121212] dark:text-[#e5e5e5] dark:border-[#10b981]" datetime="<?php echo bold_iso8601($this->created); ?>"><?php $this->date(); ?></time>
+                </div>
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-black mb-3 md:mb-4 leading-tight group-hover:text-blue-900 transition-colors dark:text-[#e5e5e5] dark:group-hover:text-[#10b981]">
                     <a href="<?php $this->permalink() ?>"><?php $this->title() ?></a>
                 </h2>
@@ -60,20 +63,23 @@ $hoverColors = [
                     <?php printExcerpt($this, 120); ?>
                 </div>
                 <a href="<?php $this->permalink() ?>" class="inline-flex items-center font-black text-base md:text-lg border-b-2 border-black hover:bg-blue-600 hover:text-white transition-all px-1 dark:text-[#10b981] dark:border-[#10b981] dark:hover:bg-[#10b981] dark:hover:text-black">
-                    阅读全文 <svg class="w-4 h-4 md:w-5 md:h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    <?php echo get_theme_text('read_more', $this); ?> <svg class="w-4 h-4 md:w-5 md:h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </a>
             </div>
         </article>
         <?php endwhile; ?>
         <?php else: ?>
-            <div class="p-10 text-xl font-bold dark:text-white">没有找到内容</div>
+            <div class="p-10 text-xl font-bold dark:text-white"><?php echo get_theme_text('no_content', $this); ?></div>
         <?php endif; ?>
     </div>
 
+    <?php if ($this->getTotal() > 0): ?>
     <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">
-        <?php $this->pageLink('← 上一页', 'prev'); ?>
-        <?php $this->pageLink('下一页 →', 'next'); ?>
+        <?php $this->pageLink(get_theme_text('prev_page', $this), 'prev'); ?>
+        <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black"><?php echo get_theme_text('page', $this); ?> <?php echo max(1, intval($this->_currentPage)); ?> / <?php echo max(1, (int) ceil($this->getTotal() / $this->parameter->pageSize)); ?></span>
+        <?php $this->pageLink(get_theme_text('next_page', $this), 'next'); ?>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 

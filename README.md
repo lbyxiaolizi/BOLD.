@@ -20,7 +20,7 @@
 
 ### 🎨 Design / 设计风格
 - **Neo-Brutalism Style** - 新粗野主义设计风格，大胆的色彩和边框
-- **Dark Mode Support** - 完整的暗黑模式支持，自动适配系统主题
+- **Dark Mode Support** - 完整的暗黑模式支持，手动切换并在浏览器中记忆偏好
 - **Responsive Design** - 全响应式设计，完美适配移动端和桌面端
 - **TailwindCSS** - 使用 TailwindCSS 构建，现代化的样式系统
 
@@ -63,6 +63,8 @@
 
 ## 📦 Installation / 安装
 
+运行环境：Typecho 1.2.1 或兼容版本（必须提供随机站点 `secret`），PHP 7.3 及以上。
+
 1. **Download** - 下载主题文件
    ```bash
    git clone https://github.com/lbyxiaolizi/BOLD.git
@@ -78,6 +80,14 @@
 
 4. **Configure** - 配置主题选项
    - 进入"控制台" → "外观" → "设置外观"
+
+### Upgrade Notes / 升级说明
+
+- 升级时必须完整上传新增的 `inc/`、`assets/` 目录以及根目录模板文件，不能只覆盖 `functions.php`。
+- 新版解锁 Cookie 使用站点密钥签名、带 7 天期限的 `v2` HMAC 票据。所有旧格式 Cookie 会立即失效，访客需要重新输入一次密码。
+- 匿名评论后可见现在要求服务器签名的评论回执；升级前已评论的匿名访客需要重新提交一次评论，登录用户不受影响。
+- 后台重新保存一次主题设置后可看到 Google Fonts 与 Feed 保护开关；未保存时仍使用安全默认值。
+- 升级前如使用了整页缓存或 CDN，请在部署后清理旧缓存，避免继续返回升级前生成的页面或订阅源。
 
 ---
 
@@ -111,6 +121,25 @@
 - **Protected Categories** - 加密分类列表（逗号分隔）
 - **Category Passwords** - 分类独立密码设置（每行一个）
 - **Homepage Display** - 加密分类文章在首页的显示（隐藏/显示）
+- **Feed Protection** - RSS/Atom 文章与评论订阅源中的受保护内容脱敏（默认开启）
+
+### Performance Settings / 性能设置
+- **Google Fonts** - 可关闭 Google Fonts（中国大陆站点建议关闭，使用系统字体）
+- **Conditional Loading** - Prism 脚本、MathJax 与 Mermaid 按内容加载；MathJax 只识别成对数学定界符，不会因普通价格中的 `$` 加载
+- **Static Assets** - Tailwind/typography 已离线编译到 `assets/css/tailwind.min.css`，主题样式与脚本可被浏览器长期缓存
+
+修改模板中的 Tailwind 类名后，用固定版本依赖重新生成 CSS：
+
+```bash
+npm ci
+npm run build:css
+```
+
+部署现有发行包不需要 Node.js；仓库已包含编译后的 CSS。
+
+### Page Fields / 页面自定义字段
+- **hideProfile** - 独立页面添加自定义字段 `hideProfile = 1` 可隐藏页首的个人简介卡片
+- **password** - 文章或独立页面添加自定义字段 `password` 可设置单篇密码；默认模板、时间轴和友情链接模板遵循相同门禁
 
 ---
 
@@ -129,6 +158,8 @@
 
 这又是公开内容
 ```
+
+匿名访客提交评论后会获得绑定文章、评论记录和规范化邮箱的 7 天签名回执；只有该条评论处于已审核状态时才会解锁。单独伪造 Typecho 的记忆邮箱 Cookie、复制其他文章回执或借用同邮箱历史评论均无效。登录用户仍按自己的已审核评论记录判断。
 
 ### Password Protection / 密码保护
 
@@ -203,12 +234,18 @@ secret:secret456
 
 ## 🔐 Security Features / 安全特性
 
-- **SHA-256 Hashing** - 密码使用 SHA-256 哈希加密
-- **CSRF Protection** - 严格的 CSRF 保护
-- **Cookie Sanitization** - Cookie 名称清理防止注入
-- **Timing-Attack Resistant** - 防时序攻击的密码比较
-- **Secure Fallback** - 未配置密码时的安全回退机制
-- **No Content Leakage** - 加密内容摘要不泄露信息
+- **HMAC Unlock Tokens** - 解锁凭据为使用 Typecho 站点密钥签名、带 7 天期限的 HMAC 票据，不再保存可永久重放的裸密码哈希
+- **Hardened Cookies** - 解锁 Cookie 使用 `HttpOnly`、`SameSite=Lax`，HTTPS 请求同时启用 `Secure`
+- **RSS Feed Protection** - 文章、分类和评论订阅源中的受保护内容自动脱敏，内联密码及 `{hide}` 内容不会进入 Feed
+- **Timing-Attack Resistant** - 密码比较使用 `hash_equals`，失败附加随机延迟
+- **Cookie Sanitization** - Cookie 名称清理防止注入，中文分类 slug 自动哈希隔离
+- **Cache Safety** - 受保护页面自动发送 `Cache-Control: private` / `Vary: Cookie`，兼容整页缓存/CDN
+- **Least-Privilege Bypass** - 仅编辑及以上登录用户可免密查看，订阅者不再绕过
+- **Signed Reply Proof** - 匿名评论后可见同时校验服务器签名回执与具体已审核评论，记忆邮箱不能单独充当授权
+- **Fail-Closed Markers** - 保护标记嵌套或闭合错误时从开启处停止公开输出，避免作者笔误导致正文外泄
+- **No Content Leakage** - 未解锁时列表、SEO 描述和社交图片不读取受保护正文；最新评论始终排除受保护文章下的讨论
+
+完整审计记录、验证状态和残余边界见 [security.md](./security.md)。
 
 ---
 

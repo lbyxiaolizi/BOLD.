@@ -1,36 +1,36 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
 <div id="comments" class="border-t-4 border-black bg-purple-50 p-3 md:p-10">
     <?php $this->comments()->to($comments); ?>
-    
+
     <h3 class="text-xl md:text-3xl font-black mb-4 md:mb-8 uppercase flex items-center gap-2 md:gap-3">
         <span class="bg-black text-white px-1.5 md:px-2"><?php $this->commentsNum(_t('0'), _t('1'), _t('%d')); ?></span> <?php echo get_theme_text('comments', $this); ?>
     </h3>
 
     <?php if($this->allow('comment')): ?>
     <div id="<?php $this->respondId(); ?>" class="mb-8 md:mb-16 bg-white border-2 md:border-4 border-black p-3 md:p-8 shadow-[3px_3px_0px_0px_#000] md:shadow-[8px_8px_0px_0px_#000]">
-        
+
         <div class="mb-3 md:mb-4">
-            <?php $comments->cancelReply('<span class="text-xs font-bold text-red-500 underline">取消回复 / Cancel</span>'); ?>
+            <?php $comments->cancelReply('<span class="text-xs font-bold text-red-500 underline">'.get_theme_text('cancel_reply', $this).' / Cancel</span>'); ?>
         </div>
 
         <h4 class="font-bold text-base md:text-lg mb-3 md:mb-4 uppercase border-b-2 border-black pb-2"><?php echo get_theme_text('leave_reply', $this); ?></h4>
-        
+
         <form method="post" action="<?php $this->commentUrl() ?>" id="comment-form">
             <?php if($this->user->hasLogin()): ?>
             <p class="mb-3 md:mb-4 font-bold text-sm md:text-base">
-                Logged in as <a href="<?php $this->options->profileUrl(); ?>" class="text-pink-600 underline font-black"><?php $this->user->screenName(); ?></a>. 
+                Logged in as <a href="<?php $this->options->profileUrl(); ?>" class="text-pink-600 underline font-black"><?php $this->user->screenName(); ?></a>.
                 <a href="<?php $this->options->logoutUrl(); ?>" class="text-gray-500 text-xs md:text-sm hover:text-black">Logout &raquo;</a>
             </p>
             <?php else: ?>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-3 md:mb-4">
-                <input type="text" name="author" placeholder="Name *" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors placeholder-gray-400 text-sm md:text-base" value="<?php $this->remember('author'); ?>" required>
-                <input type="email" name="mail" placeholder="Email *" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors placeholder-gray-400 text-sm md:text-base" value="<?php $this->remember('mail'); ?>" required>
+                <input type="text" name="author" placeholder="Name *" aria-label="Name" autocomplete="name" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors placeholder-gray-400 text-sm md:text-base" value="<?php $this->remember('author'); ?>" required>
+                <input type="email" name="mail" placeholder="Email *" aria-label="Email" autocomplete="email" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors placeholder-gray-400 text-sm md:text-base" value="<?php $this->remember('mail'); ?>" required>
             </div>
             <?php endif; ?>
-            
-            <textarea name="text" rows="3" placeholder="Your Message..." class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors mb-3 md:mb-4 placeholder-gray-400 text-sm md:text-base" required><?php $this->remember('text'); ?></textarea>
-            
-            <?php if($this->options->turnstileSiteKey): ?>
+
+            <textarea name="text" rows="3" placeholder="Your Message..." aria-label="Comment" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors mb-3 md:mb-4 placeholder-gray-400 text-sm md:text-base" required><?php $this->remember('text'); ?></textarea>
+
+            <?php if (bold_turnstile_enabled()): ?>
             <div class="mb-4 cf-turnstile" data-sitekey="<?php $this->options->turnstileSiteKey(); ?>" data-theme="auto"></div>
             <?php endif; ?>
 
@@ -42,13 +42,8 @@
     <?php endif; ?>
 
     <?php if ($comments->have()): ?>
-    
+
     <div class="comment-list-wrapper">
-        <style>
-            .comment-list { margin: 0; padding: 0; list-style: none; }
-            .avatar { display: block; width: 100%; height: auto; }
-        </style>
-        
         <?php $comments->listComments(array(
             'before'        =>  '<ol class="comment-list space-y-4 md:space-y-8">',
             'after'         =>  '</ol>',
@@ -59,11 +54,9 @@
         )); ?>
     </div>
 
-    <?php if($comments->have()): ?>
     <div class="p-3 md:p-4 flex justify-between font-bold border-t-2 border-black mt-6 md:mt-8 text-sm md:text-base">
         <?php $comments->pageNav('←', '→', 1, '...', array('wrapTag' => 'ul', 'wrapClass' => 'flex gap-2', 'itemTag' => 'li', 'textClass' => 'hover:text-pink-600', 'currentClass' => 'text-pink-600 underline')); ?>
     </div>
-    <?php endif; ?>
 
     <?php endif; ?>
 </div>

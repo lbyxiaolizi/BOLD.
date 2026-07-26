@@ -1,0 +1,11 @@
+{
+  "name": "bold-typecho-theme",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./assets/css/tailwind.input.css -o ./assets/css/tailwind.min.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "0.5.16",
+    "tailwindcss": "3.4.17"
+  }
+}

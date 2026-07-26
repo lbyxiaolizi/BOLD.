@@ -10,7 +10,7 @@
 2. **单篇文章密码保护** - 为特定文章设置独立密码
 3. **内联密码保护** - 在文章内部保护特定段落
 
-访客输入正确密码后，可以访问相应的加密内容。密码验证通过 Cookie 保存，有效期为 7 天。
+访客输入正确密码后，可以访问相应的加密内容。浏览器保存的是使用 Typecho 站点密钥签名、有效期为 7 天的 HMAC 解锁票据，不是密码或可永久重放的裸哈希。
 
 ### 一、分类密码保护
 
@@ -39,6 +39,7 @@
    - 在"全站加密密码"字段中设置一个全局密码
    - 如果某个加密分类没有设置独立密码，将使用这个全局密码
    - 如果您想让所有加密分类使用相同密码，只需设置全站密码即可
+   - 已列入加密分类但既没有独立密码也没有全站密码时，主题会保持锁定；请补全配置后再发布
 
 5. **设置加密分类在首页的显示**
    - 在"加密分类文章在首页的显示"选项中，选择"隐藏"或"显示"
@@ -54,9 +55,9 @@
 #### 摘要显示规则
 
 为了防止加密文章内容通过摘要泄露，系统采用以下规则：
-- 如果"加密分类文章在首页的显示"设为"隐藏"，摘要会显示密码保护提示
-- 如果"加密分类的归档页面是否需要密码验证"设为"不需要"，摘要会显示密码保护提示
-- 只有当文章在首页显示且归档页面需要密码验证时，摘要才会正常显示（因为此时内容在所有位置都受到保护）
+- 未解锁时，受全站密码、分类密码或文章自定义字段 `password` 保护的内容，在首页、分类、标签、搜索和作者列表中一律显示保护提示
+- 解锁后可以显示该文章的普通摘要；选择"首页隐藏"时，加密分类文章不会进入首页列表
+- 即使分类归档页面设置为"不需要"密码，列表摘要仍保持隐藏；该选项只决定是否显示分类页门禁，不会公开正文摘要
 
 #### 分类页密码保护
 
@@ -69,9 +70,10 @@
 #### 使用方法
 
 1. **编辑文章时添加自定义字段**
-   - 在文章编辑页面，找到"自定义字段"区域
+   - 在文章或独立页面编辑界面，找到"自定义字段"区域
    - 添加字段名：`password`
    - 字段值：设置您想要的密码，例如：`myarticlepass`
+   - 默认独立页、时间轴和友情链接页面模板使用相同的页面级密码门禁
 
 2. **密码优先级**
    - 文章自定义字段密码 > 分类密码 > 全站密码
@@ -115,6 +117,7 @@
 - 每个密码块独立验证，互不影响
 - 已验证的密码块会显示解锁提示
 - 在列表页不会显示密码保护的内容
+- 标记嵌套或遗漏闭合标签时按保密失败处理：从未闭合的开启标记处停止公开输出
 
 ### 使用场景示例
 
@@ -158,10 +161,12 @@ secret:xyz789
 
 ### 技术说明
 
-- 密码验证通过 Cookie 保存，有效期为 7 天
-- 不同分类/文章/内容块的密码验证是独立的（使用不同的 Cookie）
-- 已登录的用户（文章作者）可以直接查看所有加密内容
-- 密码使用 SHA-256 哈希加密存储在 Cookie 中
+- Cookie 中保存的是使用 Typecho 站点密钥签名、有效期为 7 天的 HMAC 票据，不保存明文密码或裸 SHA-256 密码哈希
+- 解锁 Cookie 使用 `HttpOnly`、`SameSite=Lax`，HTTPS 请求同时启用 `Secure`；主题要求 Typecho 提供安装时随机生成的站点 `secret`，缺失时拒绝签发票据
+- 票据与当前所需密码绑定；分类 slug 和内联内容块使用隔离的 Cookie 名称，中文 slug 也不会相互冲突
+- 页面级密码仅允许**编辑及以上**登录用户免密查看；文章作者仍可查看自己文章中的评论后可见及内联密码块
+- 匿名评论后可见要求服务器签名的 7 天回执与对应的已审核评论同时成立；伪造记忆邮箱、跨文章复制回执或借用同邮箱历史评论均不会解锁，升级前的匿名评论者需要重新提交一次评论
+- 受保护响应发送 `Cache-Control: private, no-store` 与 `Vary: Cookie`；部署在 CDN/整页缓存之后时仍应确认上游遵守这些响应头
 - 密码优先级：文章独立密码 > 分类密码 > 全站密码
 
 ---
@@ -176,7 +181,7 @@ This theme provides three types of password protection:
 2. **Individual Article Password Protection** - Set independent passwords for specific articles
 3. **Inline Password Protection** - Protect specific paragraphs within articles
 
-Visitors can access encrypted content after entering the correct password. Password verification is stored in cookies with a 7-day expiration.
+Visitors can access protected content after entering the correct password. The browser stores a 7-day HMAC unlock ticket signed with Typecho's site secret, not the password or a permanently replayable bare hash.
 
 ### 1. Category Password Protection
 
@@ -205,6 +210,7 @@ Visitors can access encrypted content after entering the correct password. Passw
    - In the "Global Encryption Password" field, set a global password
    - If an encrypted category doesn't have a specific password, it will use this global password
    - If you want all encrypted categories to use the same password, just set the global password
+   - A protected category with neither a category password nor a global password remains locked; complete the configuration before publishing it
 
 5. **Set Homepage Display for Encrypted Categories**
    - In "Encrypted category articles on homepage display" option, select "Hide" or "Show"
@@ -220,9 +226,9 @@ Visitors can access encrypted content after entering the correct password. Passw
 #### Excerpt Display Rules
 
 To prevent encrypted article content from leaking through excerpts, the system follows these rules:
-- If "Encrypted category articles on homepage display" is set to "Hide", excerpts show password protection notice
-- If "Require password for category archive page" is set to "Not Required", excerpts show password protection notice
-- Only when articles are visible on homepage AND archive pages require password verification will excerpts display normally (because content is protected at all locations)
+- Until unlocked, content protected by a global, category, or per-entry `password` field always shows a protection notice on home, category, tag, search, and author listings
+- After a matching unlock, the normal excerpt may be shown; choosing "Hide" keeps protected-category entries out of the homepage listing
+- Setting the category archive gate to "Not Required" exposes only the listing, not protected excerpts or article bodies
 
 #### Category Page Password Protection
 
@@ -235,9 +241,10 @@ To prevent encrypted article content from leaking through excerpts, the system f
 #### How to Use
 
 1. **Add Custom Field When Editing Article**
-   - In the article editor, find the "Custom Fields" section
+   - In the post or page editor, find the "Custom Fields" section
    - Add field name: `password`
    - Field value: Set your desired password, e.g., `myarticlepass`
+   - Default pages, timeline pages, and links pages enforce the same page-level password gate
 
 2. **Password Priority**
    - Article custom field password > Category password > Global password
@@ -281,6 +288,7 @@ Each password block can have different passwords.
 - Each password block is verified independently
 - Verified blocks show an unlock indicator
 - Password-protected content is hidden in article lists
+- Nested or unclosed protection markers fail closed: public output stops at the unmatched opening marker
 
 ### Usage Examples
 
@@ -324,8 +332,26 @@ Result:
 
 ### Technical Details
 
-- Password verification is stored in cookies with a 7-day expiration
-- Password verification for different categories/articles/content blocks is independent (using different cookies)
-- Logged-in users (article authors) can directly view all encrypted content
-- Passwords are stored in cookies using SHA-256 hash encryption
+- Cookies contain 7-day HMAC tickets signed with Typecho's site secret; they do not contain plaintext passwords or bare SHA-256 password hashes
+- Unlock cookies use `HttpOnly` and `SameSite=Lax`, plus `Secure` on HTTPS requests; the theme requires Typecho's installation-generated site `secret` and refuses to issue tickets when it is missing
+- Tickets are bound to the currently required password; category slugs and inline blocks use isolated cookie names, including non-ASCII slugs
+- Only logged-in users with **editor or higher** privileges bypass page-level password gates; authors may still view reply-only and inline-password blocks in their own posts
+- Anonymous reply-only access requires both a 7-day server-signed receipt and the exact approved comment; a forged remembered email, a receipt copied from another post, or an older comment sharing the email cannot unlock it, and pre-upgrade anonymous commenters must submit again
+- Protected responses send `Cache-Control: private, no-store` and `Vary: Cookie`; verify that any upstream CDN or full-page cache honors these headers
 - Password priority: Article password > Category password > Global password
+
+---
+
+## RSS/Atom 订阅源保护
+
+Typecho 的订阅源不经过主题模板渲染，且内部路由可能在生成条目时发生切换。主题通过内容钩子识别主订阅源、分类订阅源、文章评论订阅源及 `/feed/comments/`，并自动：
+
+1. 将受密码保护（全站密码 / 加密分类 / 文章自定义字段 `password`）的文章正文替换为保护提示；
+2. 对所有文章剥离 `{hide}...{/hide}` 与 `{password:...}...{/password}` 标记块，内联明文密码不会随订阅源外泄；
+3. 将受保护文章下的评论内容替换为提示，避免密码墙后的讨论从评论订阅源公开。
+
+可在主题设置「RSS/Atom 订阅源中的加密文章」中关闭整体脱敏（不建议）。文章**标题、发布时间和永久链接**仍会出现在订阅源中，与归档页的公开元数据一致，因此不要在标题中写入秘密。升级前已被 Feed 阅读器、搜索引擎或 CDN 缓存的内容无法由主题主动撤回，部署后应清理可控缓存。
+
+## 解锁凭据说明
+
+密码验证成功后写入的 Cookie 是使用 Typecho 随机站点密钥签名、带 7 天期限的 `v2` HMAC 票据。票据过期、修改对应密码或轮换 Typecho 站点密钥后立即失效。所有旧格式 Cookie 均不兼容，升级后访客需要重新输入一次密码。已登录用户中仅**编辑及以上**权限可免密通过页面级门禁。

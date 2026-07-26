@@ -1,4 +1,38 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
+<?php
+$_boldIsArticle = $this->is('post') || $this->is('page');
+
+// 当前页面规范化 URL：
+// 文章/页面用 permalink；其余页面基于 siteUrl + 路径生成，
+// 不再信任 HTTP_HOST / 原样拼接查询串（仅保留分页参数）
+if ($_boldIsArticle) {
+    ob_start();
+    $this->permalink();
+    $_boldCurrentUrl = ob_get_clean();
+} else {
+    $_boldRequestUri = Typecho_Request::getInstance()->getRequestUri();
+    $_boldPath = parse_url($_boldRequestUri, PHP_URL_PATH);
+    $_boldCurrentUrl = rtrim($this->options->siteUrl, '/') . ($_boldPath !== null && $_boldPath !== false ? $_boldPath : '/');
+    parse_str(strval(parse_url($_boldRequestUri, PHP_URL_QUERY) ?: ''), $_boldQueryArgs);
+    if (!empty($_boldQueryArgs['page'])) {
+        $_boldCurrentUrl .= '?page=' . intval($_boldQueryArgs['page']);
+    }
+}
+$_boldCurrentUrlAttr = htmlspecialchars($_boldCurrentUrl, ENT_QUOTES, 'UTF-8');
+
+// 描述与标题统一转义后进入属性上下文（double_encode=false 避免二次转义）
+$_boldDescriptionAttr = htmlspecialchars(get_seo_description($this), ENT_QUOTES, 'UTF-8', false);
+$_boldSiteTitleAttr = htmlspecialchars(strval($this->options->title), ENT_QUOTES, 'UTF-8', false);
+$_boldFaviconAttr = htmlspecialchars(strval($this->options->faviconUrl ?? ''), ENT_QUOTES, 'UTF-8');
+
+ob_start();
+$this->archiveTitle('', '', ' - ');
+$this->options->title();
+$_boldFullTitle = trim(ob_get_clean());
+$_boldFullTitleAttr = htmlspecialchars($_boldFullTitle, ENT_QUOTES, 'UTF-8', false);
+
+$_boldOgImage = get_og_image($this);
+?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -6,771 +40,185 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 强制浏览器使用网站指定的颜色方案，防止移动端系统黑暗模式与网站白天模式冲突 -->
     <meta name="color-scheme" id="color-scheme-meta" content="light">
-    
+
     <title><?php $this->archiveTitle(array(
             'category'  =>  _t('分类 %s 下的文章'),
             'search'    =>  _t('包含关键字 %s 的文章'),
             'tag'       =>  _t('标签 %s 下的文章'),
             'author'    =>  _t('%s 发布的文章')
-        ), '', ' - '); ?><?php $this->options->title(); ?></title>
-    
+        ), '', ' - '); ?><?php $this->options->title(); ?><?php if ($this->_currentPage > 1): ?> - <?php echo sprintf(get_theme_text('page_n', $this), $this->_currentPage); ?><?php endif; ?></title>
+
     <!-- Favicon -->
     <?php if ($this->options->faviconUrl): ?>
-    <link rel="icon" href="<?php $this->options->faviconUrl(); ?>" />
+    <link rel="icon" href="<?php echo $_boldFaviconAttr; ?>" />
     <?php endif; ?>
 
     <!-- Canonical URL (SEO 核心: 规范化链接) -->
-    <?php
-    // 安全获取当前页面 URL（permalink() 在空归档页会触发致命错误）
-    if ($this->is('post') || $this->is('page')) {
-        ob_start();
-        $this->permalink();
-        $_boldCurrentUrl = ob_get_clean();
-    } else {
-        $_boldCurrentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-            . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    }
-    ?>
-    <link rel="canonical" href="<?php echo $_boldCurrentUrl; ?>" />
+    <link rel="canonical" href="<?php echo $_boldCurrentUrlAttr; ?>" />
+
+    <?php if ($this->is('search')): ?>
+    <!-- 搜索结果页不进索引 -->
+    <meta name="robots" content="noindex, follow" />
+    <?php endif; ?>
 
     <!-- RSS & Atom Feeds (博客标配: 订阅源) -->
-    <link rel="alternate" type="application/rss+xml" title="<?php $this->options->title(); ?> &raquo; RSS 2.0" href="<?php $this->options->feedUrl(); ?>" />
-    <link rel="alternate" type="application/rdf+xml" title="<?php $this->options->title(); ?> &raquo; RSS 1.0" href="<?php $this->options->feedUrl('rss1'); ?>" />
-    <link rel="alternate" type="application/atom+xml" title="<?php $this->options->title(); ?> &raquo; Atom 1.0" href="<?php $this->options->feedUrl('atom'); ?>" />
+    <link rel="alternate" type="application/rss+xml" title="<?php echo $_boldSiteTitleAttr; ?> &raquo; RSS 2.0" href="<?php $this->options->feedUrl(); ?>" />
+    <link rel="alternate" type="application/rdf+xml" title="<?php echo $_boldSiteTitleAttr; ?> &raquo; RSS 1.0" href="<?php $this->options->feedUrl('rss1'); ?>" />
+    <link rel="alternate" type="application/atom+xml" title="<?php echo $_boldSiteTitleAttr; ?> &raquo; Atom 1.0" href="<?php $this->options->feedUrl('atom'); ?>" />
 
     <!-- Meta SEO -->
-    <meta name="description" content="<?php echo get_seo_description($this); ?>" />
+    <meta name="description" content="<?php echo $_boldDescriptionAttr; ?>" />
     <meta name="keywords" content="<?php $this->keywords(','); ?>" />
-    
+
     <!-- Open Graph / Twitter Card (社交分享优化) -->
-    <meta property="og:site_name" content="<?php $this->options->title(); ?>" />
+    <meta property="og:site_name" content="<?php echo $_boldSiteTitleAttr; ?>" />
     <meta property="og:type" content="<?php echo $this->is('post') ? 'article' : 'website'; ?>" />
-    <meta property="og:url" content="<?php echo $_boldCurrentUrl; ?>" />
-    <meta property="og:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />
-    <meta property="og:description" content="<?php echo get_seo_description($this); ?>" />
-    <meta property="og:image" content="<?php echo get_og_image($this); ?>" />
-    <?php if ($this->is('post') || $this->is('page')): ?>
-    <meta property="article:published_time" content="<?php $this->date('c'); ?>" />
-    <meta property="article:modified_time" content="<?php echo date('c', $this->modified); ?>" />
+    <meta property="og:url" content="<?php echo $_boldCurrentUrlAttr; ?>" />
+    <meta property="og:title" content="<?php echo $_boldFullTitleAttr; ?>" />
+    <meta property="og:description" content="<?php echo $_boldDescriptionAttr; ?>" />
+    <?php if (!empty($_boldOgImage)): ?>
+    <meta property="og:image" content="<?php echo htmlspecialchars($_boldOgImage, ENT_QUOTES, 'UTF-8'); ?>" />
     <?php endif; ?>
-    
+    <?php if ($_boldIsArticle): ?>
+    <meta property="article:published_time" content="<?php echo bold_iso8601($this->created); ?>" />
+    <meta property="article:modified_time" content="<?php echo bold_iso8601($this->modified); ?>" />
+    <?php endif; ?>
+
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="<?php $this->archiveTitle('', '', ' - '); ?><?php $this->options->title(); ?>" />
-    <meta name="twitter:description" content="<?php echo get_seo_description($this); ?>" />
-    <meta name="twitter:image" content="<?php echo get_og_image($this); ?>" />
-
-    <!-- JSON-LD Structured Data (Google 结构化数据) -->
-    <?php if ($this->is('post') || $this->is('page')): ?>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "BlogPosting",
-      "headline": "<?php $this->title(); ?>",
-      "image": ["<?php echo get_og_image($this); ?>"],
-      "datePublished": "<?php $this->date('c'); ?>",
-      "dateModified": "<?php echo date('c', $this->modified); ?>",
-      "author": {
-        "@type": "Person",
-        "name": "<?php $this->author(); ?>"
-      },
-      "description": "<?php echo get_seo_description($this); ?>",
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "<?php $this->permalink(); ?>"
-      }
-    }
-    </script>
-    <?php else: ?>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "<?php $this->options->title(); ?>",
-      "url": "<?php $this->options->siteUrl(); ?>",
-      "description": "<?php $this->options->description(); ?>"
-    }
-    </script>
+    <meta name="twitter:title" content="<?php echo $_boldFullTitleAttr; ?>" />
+    <meta name="twitter:description" content="<?php echo $_boldDescriptionAttr; ?>" />
+    <?php if (!empty($_boldOgImage)): ?>
+    <meta name="twitter:image" content="<?php echo htmlspecialchars($_boldOgImage, ENT_QUOTES, 'UTF-8'); ?>" />
     <?php endif; ?>
 
-    <!-- 资源引用 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <script>tailwind.config = { darkMode: 'class' }</script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.18.2/tocbot.css">
-    
-    <!-- Cloudflare Turnstile JS -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <!-- JSON-LD Structured Data（json_encode 保证转义合法，正文含引号/反斜杠不再破坏结构） -->
+    <?php
+    if ($_boldIsArticle) {
+        ob_start(); $this->title();  $_boldPostTitle = ob_get_clean();
+        ob_start(); $this->author(); $_boldAuthorName = ob_get_clean();
+        $_boldJsonLd = array(
+            '@context'      => 'https://schema.org',
+            '@type'         => 'BlogPosting',
+            'headline'      => html_entity_decode(strip_tags($_boldPostTitle), ENT_QUOTES, 'UTF-8'),
+            'datePublished' => bold_iso8601($this->created),
+            'dateModified'  => bold_iso8601($this->modified),
+            'author'        => array(
+                '@type' => 'Person',
+                'name'  => html_entity_decode(strip_tags($_boldAuthorName), ENT_QUOTES, 'UTF-8'),
+            ),
+            'description'   => get_seo_description($this),
+            'mainEntityOfPage' => array(
+                '@type' => 'WebPage',
+                '@id'   => $_boldCurrentUrl,
+            ),
+        );
+        if (!empty($_boldOgImage)) {
+            $_boldJsonLd['image'] = array($_boldOgImage);
+        }
+    } else {
+        $_boldJsonLd = array(
+            '@context'    => 'https://schema.org',
+            '@type'       => 'WebSite',
+            'name'        => html_entity_decode(strip_tags(strval($this->options->title)), ENT_QUOTES, 'UTF-8'),
+            'url'         => strval($this->options->siteUrl),
+            'description' => strval($this->options->description),
+        );
+    }
+    ?>
+    <script type="application/ld+json"><?php echo json_encode(
+        $_boldJsonLd,
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ); ?></script>
 
+    <script>document.documentElement.classList.add('bold-loading');</script>
     <style>
-        /* 防闪烁 (Anti-FOUC) */
-        body { opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out; }
-        body.loaded { opacity: 1; visibility: visible; }
-        
-        /* --- 核心变量定义 --- */
-        :root {
-            /* 强制日间模式颜色方案，防止移动端系统黑暗模式干扰 */
-            color-scheme: light;
-            /* 日间模式 (Light) */
-            --bg-page: #f8f8f8;
-            --bg-card: #ffffff;
-            --text-main: #1a1a1a;
-            --text-muted: #4b5563;
-            --border-color: #000000;
-            --accent-color: #db2777; /* 粉色 */
-            --accent-bg: #fce7f3;
-            --btn-bg: #000000;
-            --btn-text: #ffffff;
-            --gradient-center: #db2777; 
-            --gradient-edge: #000000;
-            --dot-color: #e5e7eb;
-        }
-
-        /* 暗黑模式 (Dark) - 统一使用 .dark-mode 类 */
-        .dark-mode {
-            /* 暗黑模式颜色方案 */
-            color-scheme: dark;
-            --bg-page: #121212;          /* 深灰黑背景 */
-            --bg-card: #1e1e1e;          /* 卡片背景 */
-            --text-main: #e5e5e5;        /* 主文字 */
-            --text-muted: #a3a3a3;       /* 次要文字 */
-            --border-color: #10b981;     /* 翡翠绿 */
-            --accent-color: #10b981;     /* 强调色 */
-            --accent-bg: #064e3b;        /* 强调背景 */
-            --btn-bg: #10b981;           /* 按钮背景 */
-            --btn-text: #000000;         /* 按钮文字 */
-            --gradient-center: #10b981;
-            --gradient-edge: #ffffff;
-            --dot-color: #333333;
-        }
-
-        /* --- 全局样式 --- */
-        body { 
-            font-family: 'Noto Sans SC', sans-serif; 
-            background-color: var(--bg-page); 
-            color: var(--text-main); 
-            background-image: radial-gradient(var(--dot-color) 1px, transparent 1px); 
-            background-size: 20px 20px; 
-            transition: background-color 0.3s, color 0.3s, background-image 0.3s;
-        }
-
-        /* --- 强制 Tailwind 类适配 (Universal Override) --- */
-        
-        /* 背景适配 */
-        .dark-mode .bg-white { background-color: var(--bg-card) !important; color: var(--text-main) !important; }
-        .dark-mode .bg-gray-50 { background-color: #18181b !important; } 
-        .dark-mode .bg-yellow-50 { background-color: #262626 !important; } 
-        .dark-mode .bg-purple-50 { background-color: #171717 !important; }
-        .dark-mode .bg-purple-100 { background-color: var(--accent-color) !important; color: #000 !important; }
-        
-        /* 文本适配 */
-        .dark-mode .text-black { color: var(--text-main) !important; }
-        .dark-mode .text-gray-500, 
-        .dark-mode .text-gray-600, 
-        .dark-mode .text-gray-700, 
-        .dark-mode .text-gray-800, 
-        .dark-mode .text-gray-900 { color: var(--text-muted) !important; }
-        
-        /* 边框适配 */
-        .dark-mode .border-black { border-color: var(--border-color) !important; }
-        
-        /* 按钮适配 */
-        .dark-mode .bg-black { 
-            background-color: var(--btn-bg) !important; 
-            color: var(--btn-text) !important; 
-        }
-        .dark-mode .text-white { color: var(--btn-text) !important; }
-        
-        /* 阴影适配 */
-        .dark-mode [class*="shadow-"] {
-            box-shadow: 4px 4px 0px 0px var(--border-color) !important;
-        }
-        .dark-mode .shadow-\[8px_8px_0px_0px_\#000\] { box-shadow: 8px 8px 0px 0px var(--border-color) !important; }
-        
-        /* 交互悬停适配 */
-        .dark-mode .hover\:bg-yellow-100:hover,
-        .dark-mode .hover\:bg-yellow-200:hover { 
-            background-color: #2d2d2d !important;
-            color: var(--accent-color) !important; 
-        }
-        
-        .dark-mode .hover\:text-black:hover { color: var(--text-main) !important; }
-        .dark-mode .group:hover .text-pink-600 { color: var(--accent-color) !important; }
-
-        /* 侧边栏评论特殊适配 */
-        .dark-mode .group .bg-purple-100,
-        .dark-mode .group .bg-gray-200 { 
-            background-color: var(--accent-color) !important; 
-            color: #000 !important; 
-        }
-        .dark-mode .group:hover .bg-purple-100,
-        .dark-mode .group:hover .bg-gray-200 {
-            background-color: #a855f7 !important;
-            color: #fff !important;
-        }
-
-        /* 滚动条 */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-card); }
-        ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #fff; }
-        .dark-mode ::-webkit-scrollbar-thumb { background: var(--border-color); border-color: #000; }
-        .dark-mode ::-webkit-scrollbar-track { background: #000; border-left: 3px solid var(--border-color); }
-
-        /* Prose 适配 */
-        .dark-mode .prose { color: var(--text-main) !important; }
-        .dark-mode .prose p, .dark-mode .prose ul, .dark-mode .prose ol { color: var(--text-main) !important; }
-        .dark-mode .prose h1, .dark-mode .prose h2, .dark-mode .prose h3, 
-        .dark-mode .prose strong, .dark-mode .prose b { color: #ffffff !important; }
-        .dark-mode .prose a { color: var(--accent-color) !important; border-bottom-color: var(--accent-color) !important; }
-        .dark-mode .prose blockquote { 
-            background-color: #262626 !important; 
-            border-left-color: var(--border-color) !important; 
-            color: var(--text-main) !important; 
-        }
-        .dark-mode .prose pre { 
-            border-color: var(--border-color) !important; 
-            box-shadow: 6px 6px 0px 0px var(--border-color) !important; 
-        }
-
-        /* 修复移动端代码块和公式溢出问题 */
-        .prose pre {
-            overflow-x: auto;
-            overflow-y: hidden;
-            max-width: 100%;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .prose code {
-            overflow-wrap: break-word;
-        }
-
-        .prose pre code {
-            overflow-wrap: normal;
-            white-space: pre;
-        }
-
-        /* MathJax 公式溢出处理 */
-        .prose .MathJax,
-        .prose mjx-container {
-            overflow-x: auto;
-            overflow-y: hidden;
-            max-width: 100%;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* 移动端特别优化 */
-        @media (max-width: 767px) {
-            .prose pre {
-                padding: 1rem;
-                /* 负边距使代码块扩展到容器边缘，更好地利用移动端屏幕空间 */
-                margin-left: -1rem;
-                margin-right: -1rem;
-                border-radius: 0;
-            }
-
-            .prose .MathJax,
-            .prose mjx-container {
-                font-size: 0.9em;
-            }
-        }
-
-        /* ====== 代码块粗野风格样式 (Brutalist Code Blocks) ====== */
-        
-        /* 代码块容器 - 粗野风格 */
-        .prose pre[class*="language-"] {
-            background: #1e1e1e !important;
-            border: 4px solid #000 !important;
-            border-radius: 0 !important;
-            box-shadow: 8px 8px 0px 0px #000 !important;
-            margin: 2rem 0 !important;
-            padding: 1.5rem !important;
-            position: relative;
-            overflow-x: auto;
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 0.95rem !important;
-            line-height: 1.6 !important;
-        }
-
-        /* 行内代码 - 粗野风格 */
-        .prose code:not([class*="language-"]) {
-            background: #fef08a !important;
-            color: #000 !important;
-            padding: 0.2em 0.4em !important;
-            border: 2px solid #000 !important;
-            border-radius: 0 !important;
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 0.9em !important;
-            font-weight: 700 !important;
-        }
-
-        /* 代码块内的代码文本 */
-        .prose pre[class*="language-"] code {
-            background: transparent !important;
-            padding: 0 !important;
-            border: none !important;
-            color: #f8f8f2 !important;
-            font-size: inherit !important;
-            font-weight: 400 !important;
-        }
-
-        /* Prism Toolbar 样式 - 粗野风格 */
-        div.code-toolbar {
-            position: relative;
-        }
-
-        div.code-toolbar > .toolbar {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            z-index: 10;
-        }
-
-        div.code-toolbar > .toolbar button {
-            background: #fef08a !important;
-            color: #000 !important;
-            border: 3px solid #000 !important;
-            border-radius: 0 !important;
-            padding: 0.4rem 0.8rem !important;
-            font-family: 'Noto Sans SC', sans-serif !important;
-            font-weight: 700 !important;
-            font-size: 0.75rem !important;
-            text-transform: uppercase !important;
-            cursor: pointer !important;
-            box-shadow: 3px 3px 0px 0px #000 !important;
-            transition: all 0.2s ease !important;
-        }
-
-        div.code-toolbar > .toolbar button:hover {
-            background: #fff !important;
-            transform: translate(2px, 2px) !important;
-            box-shadow: 1px 1px 0px 0px #000 !important;
-        }
-
-        /* 代码高亮颜色优化 - 增强版 (Enhanced Syntax Highlighting) */
-        
-        /* 注释 - 灰蓝色 */
-        .token.comment,
-        .token.prolog,
-        .token.doctype,
-        .token.cdata {
-            color: #7c8a99 !important;
-            font-style: italic !important;
-        }
-
-        /* 标点符号 - 浅白色 */
-        .token.punctuation {
-            color: #d4d4d4 !important;
-        }
-
-        /* 命名空间 - 半透明 */
-        .token.namespace {
-            opacity: 0.7 !important;
-        }
-
-        /* 标签、属性、常量 - 粉红色 */
-        .token.property,
-        .token.tag,
-        .token.constant,
-        .token.symbol,
-        .token.deleted {
-            color: #ff6b9d !important;
-            font-weight: 600 !important;
-        }
-
-        /* 布尔值、数字 - 紫色 */
-        .token.boolean,
-        .token.number {
-            color: #bd93f9 !important;
-            font-weight: 600 !important;
-        }
-
-        /* 选择器、属性名、字符串 - 亮绿色 */
-        .token.selector,
-        .token.attr-name,
-        .token.string,
-        .token.char,
-        .token.builtin,
-        .token.inserted {
-            color: #50fa7b !important;
-        }
-
-        /* 运算符、实体、URL - 青色 */
-        .token.operator,
-        .token.entity,
-        .token.url,
-        .language-css .token.string,
-        .style .token.string,
-        .token.variable {
-            color: #8be9fd !important;
-        }
-
-        /* @规则、属性值、函数、类名 - 黄色 */
-        .token.atrule,
-        .token.attr-value,
-        .token.function,
-        .token.class-name {
-            color: #f1fa8c !important;
-            font-weight: 600 !important;
-        }
-
-        /* 关键字 - 亮青色 */
-        .token.keyword {
-            color: #8be9fd !important;
-            font-weight: 700 !important;
-        }
-
-        /* 正则表达式、重要标记 - 橙色 */
-        .token.regex,
-        .token.important {
-            color: #ffb86c !important;
-            font-weight: 600 !important;
-        }
-
-        /* 粗体 */
-        .token.important,
-        .token.bold {
-            font-weight: 700 !important;
-        }
-
-        /* 斜体 */
-        .token.italic {
-            font-style: italic !important;
-        }
-
-        /* 实体 */
-        .token.entity {
-            cursor: help !important;
-        }
-
-        /* Python/Ruby 特定 - 装饰器 */
-        .token.decorator,
-        .token.annotation {
-            color: #ff79c6 !important;
-        }
-
-        /* HTML/XML 属性值 */
-        .token.attr-value > .token.punctuation {
-            color: #50fa7b !important;
-        }
-
-        /* JavaScript/TypeScript 特定 */
-        .language-javascript .token.keyword,
-        .language-typescript .token.keyword {
-            color: #ff79c6 !important;
-        }
-
-        /* CSS 选择器增强 */
-        .language-css .token.selector {
-            color: #50fa7b !important;
-        }
-
-        /* CSS 属性 */
-        .language-css .token.property {
-            color: #8be9fd !important;
-        }
-
-        /* 行号样式 - 粗野风格 */
-        .line-numbers .line-numbers-rows {
-            border-right: 3px solid #333 !important;
-            background: #1a1a1a !important;
-            padding-right: 0.5em !important;
-        }
-
-        .line-numbers-rows > span:before {
-            color: #666 !important;
-            font-weight: 600 !important;
-        }
-
-        .dark-mode .line-numbers .line-numbers-rows {
-            border-right-color: var(--border-color) !important;
-            background: #000 !important;
-        }
-
-        .dark-mode .line-numbers-rows > span:before {
-            color: #10b981 !important;
-        }
-
-        /* 暗黑模式代码块适配 */
-        .dark-mode .prose pre[class*="language-"] {
-            background: #0d0d0d !important;
-            border-color: var(--border-color) !important;
-            box-shadow: 8px 8px 0px 0px var(--border-color) !important;
-        }
-
-        .dark-mode .prose code:not([class*="language-"]) {
-            background: #064e3b !important;
-            color: var(--accent-color) !important;
-            border-color: var(--border-color) !important;
-        }
-
-        .dark-mode div.code-toolbar > .toolbar button {
-            background: var(--accent-color) !important;
-            color: #000 !important;
-            border-color: #000 !important;
-            box-shadow: 3px 3px 0px 0px #000 !important;
-        }
-
-        .dark-mode div.code-toolbar > .toolbar button:hover {
-            background: #064e3b !important;
-            color: var(--accent-color) !important;
-            border-color: var(--accent-color) !important;
-            box-shadow: 1px 1px 0px 0px var(--accent-color) !important;
-        }
-
-        /* 移动端代码块字体大小优化 */
-        @media (max-width: 767px) {
-            .prose pre[class*="language-"] {
-                font-size: 0.85rem !important;
-                padding: 1rem !important;
-                box-shadow: 6px 6px 0px 0px #000 !important;
-            }
-
-            .prose code:not([class*="language-"]) {
-                font-size: 0.85em !important;
-            }
-
-            div.code-toolbar > .toolbar button {
-                font-size: 0.7rem !important;
-                padding: 0.3rem 0.6rem !important;
-            }
-
-            .dark-mode .prose pre[class*="language-"] {
-                box-shadow: 6px 6px 0px 0px var(--border-color) !important;
-            }
-        }
-
-        /* 超小屏幕优化 */
-        @media (max-width: 480px) {
-            .prose pre[class*="language-"] {
-                font-size: 0.8rem !important;
-                padding: 0.875rem !important;
-            }
-        }
-
-        /* Mermaid 图表 */
-        .prose .mermaid-wrapper {
-            margin: 2rem 0 !important;
-            padding: 1rem;
-            max-width: 100%;
-            overflow-x: auto;
-            background: #fff;
-            border: 4px solid #000;
-            box-shadow: 8px 8px 0px 0px #000;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .prose .mermaid {
-            min-width: min-content;
-            text-align: center;
-        }
-
-        .prose .mermaid svg {
-            max-width: 100%;
-            height: auto;
-            margin: 0 auto;
-        }
-
-        .dark-mode .prose .mermaid-wrapper {
-            background: #121212;
-            border-color: var(--border-color);
-            box-shadow: 8px 8px 0px 0px var(--border-color);
-        }
-
-        @media (max-width: 767px) {
-            .prose .mermaid-wrapper {
-                margin-left: -1rem !important;
-                margin-right: -1rem !important;
-                padding: 0.75rem;
-                box-shadow: 6px 6px 0px 0px #000;
-            }
-
-            .dark-mode .prose .mermaid-wrapper {
-                box-shadow: 6px 6px 0px 0px var(--border-color);
-            }
-        }
-        
-        /* 输入框 */
-        .dark-mode input, .dark-mode textarea { 
-            background-color: #000 !important; 
-            color: #fff !important; 
-            border-color: var(--border-color) !important; 
-        }
-
-        /* 标题光标跟随特效 */
-        .mouse-gradient-text { 
-            color: var(--text-main); 
-            transition: color 0.1s; 
-            position: relative;
-            z-index: 10;
-        }
-        .group:hover .mouse-gradient-text {
-            color: transparent; 
-            background-image: radial-gradient(
-                circle 180px at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-                var(--gradient-center) 0%, 
-                var(--gradient-edge) 120%
-            );
-            background-clip: text; 
-            -webkit-background-clip: text; 
-            background-repeat: no-repeat;
-        }
-        .group:hover .mouse-gradient-text span { color: transparent; }
-        
-        /* 链接动画 */
-        .hover-underline-animation { display: inline-block; position: relative; } 
-        .hover-underline-animation::after { content: ''; position: absolute; width: 100%; transform: scaleX(0); height: 4px; bottom: 0; left: 0; background-color: var(--accent-color); transform-origin: bottom right; transition: transform 0.25s ease-out; } 
-        .hover-underline-animation:hover::after { transform: scaleX(1); transform-origin: bottom left; }
-        
-        /* TOC Active Link */
-        .toc-container .toc-list {
-            margin: 0;
-            padding-left: 0;
-            list-style: none;
-        }
-
-        .toc-container .toc-list .toc-list {
-            margin-top: 0.35rem;
-            padding-left: 1.15rem;
-            border-left: 2px solid var(--border-color);
-        }
-
-        .toc-container .toc-list-item {
-            margin: 0.25rem 0;
-        }
-
-        .toc-container .toc-link {
-            display: inline-block;
-            max-width: calc(100% - 1.75rem);
-            padding: 0.2rem 0.35rem;
-            color: var(--text-main);
-            line-height: 1.35;
-            text-decoration: none;
-            word-break: break-word;
-        }
-
-        .toc-container .toc-link:hover,
-        .toc-container .is-active-link {
-            background: var(--accent-color);
-            color: #fff !important;
-            box-shadow: 3px 3px 0px 0px var(--border-color);
-        }
-
-        .toc-container .toc-toggle {
-            width: 1.25rem;
-            height: 1.25rem;
-            margin-right: 0.25rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            vertical-align: top;
-            border: 2px solid var(--border-color);
-            background: var(--bg-card);
-            color: var(--text-main);
-            cursor: pointer;
-            transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
-        }
-
-        .toc-container .toc-toggle::before {
-            content: '';
-            width: 0;
-            height: 0;
-            border-top: 0.28rem solid transparent;
-            border-bottom: 0.28rem solid transparent;
-            border-left: 0.42rem solid currentColor;
-            transform: rotate(90deg);
-            transform-origin: center;
-            transition: transform 0.18s ease;
-        }
-
-        .toc-container .toc-toggle:hover {
-            background: var(--accent-color);
-            color: #fff;
-        }
-
-        .toc-container .toc-toggle-placeholder {
-            width: 1.25rem;
-            margin-right: 0.25rem;
-            display: inline-block;
-            vertical-align: top;
-        }
-
-        .toc-container .toc-list.is-collapsible,
-        .toc-container .toc-list.is-collapsed {
-            max-height: none;
-            overflow: hidden;
-        }
-
-        .toc-container .toc-list-item.is-toc-collapsed > .toc-list {
-            display: none;
-            max-height: 0;
-            overflow: hidden;
-        }
-
-        .toc-container .toc-list-item.is-toc-collapsed > .toc-toggle::before {
-            transform: rotate(0deg);
-        }
-
-        .dark-mode .toc-container .toc-link:hover,
-        .dark-mode .toc-container .is-active-link { background: var(--accent-color); color: #000 !important; box-shadow: 4px 4px 0px 0px #fff; }
-
-        /* --- TOC Sticky (目录悬浮) --- */
-        #toc-wrapper {
-            position: -webkit-sticky;
-            position: sticky;
-            top: 160px; /* 避开顶部导航栏的高度 */
-            z-index: 30;
-            background-color: var(--bg-card);
-        }
-
-        .toc-container {
-            max-height: min(420px, calc(100vh - 260px));
-            overflow-y: auto;
-            overflow-x: hidden;
-            overscroll-behavior: contain;
-            padding-right: 0.25rem;
-            scrollbar-width: none;
-        }
-        .toc-container::-webkit-scrollbar { display: none; }
+        /* 防闪烁 (Anti-FOUC)：门控与解除规则必须在任何同步外链脚本前注册，
+           外部 CSS/JS 加载失败时也不会把页面永远锁在隐藏状态 */
+        body { transition: opacity 0.3s ease-in-out; }
+        html.bold-loading body { opacity: 0; visibility: hidden; }
+        html:not(.bold-loading) body, body.loaded { opacity: 1; visibility: visible; }
     </style>
-    
+    <noscript>
+        <!-- 禁用 JS 时直接显示页面 -->
+        <style>body { opacity: 1 !important; visibility: visible !important; }</style>
+    </noscript>
+
     <script>
-        function applyTheme() {
-            const isDark = localStorage.getItem('darkMode') === 'true';
-            const colorSchemeMeta = document.getElementById('color-scheme-meta');
-            if (isDark) {
-                document.documentElement.classList.add('dark-mode');
-                if (document.body) document.body.classList.add('dark-mode');
-                if (colorSchemeMeta) colorSchemeMeta.setAttribute('content', 'dark');
-            } else {
-                document.documentElement.classList.remove('dark-mode');
-                if (document.body) document.body.classList.remove('dark-mode');
-                if (colorSchemeMeta) colorSchemeMeta.setAttribute('content', 'light');
+        // 主题色初始化：localStorage 读取包裹 try/catch，
+        // 隐私模式/禁用存储抛异常时按浅色处理，绝不阻断后续脚本
+        window.applyTheme = function() {
+            var dark = false;
+            try { dark = localStorage.getItem('darkMode') === 'true'; } catch (e) {}
+            var targets = [document.documentElement, document.body];
+            for (var i = 0; i < targets.length; i++) {
+                if (!targets[i]) continue;
+                targets[i].classList.toggle('dark-mode', dark);
+                targets[i].classList.toggle('dark', dark);
             }
-        }
+            var colorSchemeMeta = document.getElementById('color-scheme-meta');
+            if (colorSchemeMeta) colorSchemeMeta.setAttribute('content', dark ? 'dark' : 'light');
+            return dark;
+        };
         applyTheme();
-        
-        document.addEventListener('DOMContentLoaded', function() { 
-            setTimeout(function() { document.body.classList.add('loaded'); }, 50); 
-            applyTheme(); 
-        });
-        window.onload = function() { document.body.classList.add('loaded'); };
     </script>
+    <script>
+        // 解除首屏遮罩：与主题初始化解耦的独立块，
+        // 并带 1.5s 超时兜底 —— 任何后续脚本/CDN 失败都不会白屏
+        (function() {
+            function reveal() {
+                document.documentElement.classList.remove('bold-loading');
+                if (document.body) document.body.classList.add('loaded');
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() { applyTheme(); reveal(); });
+            } else { applyTheme(); reveal(); }
+            window.addEventListener('load', reveal);
+            setTimeout(reveal, 1500);
+        })();
+    </script>
+
+    <!-- 资源引用：preconnect 提前建连 -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+    <?php if ($this->options->loadGoogleFonts != '0'): ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 异步加载字体样式表，不阻塞首屏渲染 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap"></noscript>
+    <?php endif; ?>
+
+    <?php if ($_boldIsArticle): ?>
+    <!-- Prism 样式在文章/独立页加载，覆盖渲染后才识别出代码块的兜底路径；JS 仍按内容加载 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/<?php echo BOLD_PRISM_VERSION; ?>/themes/prism-okaidia.min.css" rel="stylesheet" integrity="sha384-qTzu9jz8wpyzFe5KLoZfw0CS5iY+kCoZlBd5ByJ3f0NUT9dgCIU19M1IQKj594Ei" crossorigin="anonymous" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/<?php echo BOLD_PRISM_VERSION; ?>/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet" integrity="sha384-EUzJ34/1CCeefTGUKLgvA5Z/vYIwi+Jyu8aAaCfFDxfwZ3Xs3OfkkIeegsLRM11e" crossorigin="anonymous" />
+    <?php endif; ?>
+
+    <?php if ($_boldIsArticle): ?>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/<?php echo BOLD_TOCBOT_VERSION; ?>/tocbot.css" integrity="sha384-HuS9Oz9KEyjRH338lAKGE0+hsZL1wg/gXPfyHzbC27dcfnr04LmgdtUqn9PU91i0" crossorigin="anonymous">
+    <?php endif; ?>
+
+    <!-- Tailwind 与主题样式均为离线构建/静态资源，可被浏览器缓存 -->
+    <link rel="stylesheet" href="<?php $this->options->themeUrl('assets/css/tailwind.min.css'); ?>?v=<?php echo BOLD_VERSION; ?>">
+    <link rel="stylesheet" href="<?php $this->options->themeUrl('assets/css/bold.css'); ?>?v=<?php echo BOLD_VERSION; ?>">
+
+    <?php if (bold_turnstile_enabled() && $_boldIsArticle): ?>
+    <!-- Cloudflare Turnstile：仅在有评论表单的页面且已完整配置时加载 -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <?php endif; ?>
 
     <!-- 自定义头部代码 (如验证Meta、自定义CSS) -->
     <?php $this->options->customHead(); ?>
 
-    <?php $this->header(); ?>
+    <?php $this->header('description=&keywords=&generator=&template=&rss2=&rss1=&atom='); ?>
 </head>
-<!--<body class="flex flex-col min-h-screen border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">-->
 <body class="flex flex-col min-h-screen border-t-4 border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">
-    
+
 <header class="border-b-4 border-black p-6 md:p-10 bg-white sticky top-0 z-50 transition-colors duration-300">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div class="flex justify-between w-full md:w-auto items-center">
-            
+
             <a href="<?php $this->options->siteUrl(); ?>" class="group block relative" id="site-logo">
                 <h1 class="mouse-gradient-text text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter uppercase leading-none transition-all">
                     <?php if($this->options->logoText): ?>
@@ -783,27 +231,11 @@
                     <?php $this->options->description() ?>
                 </p>
             </a>
-
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    const logoLink = document.getElementById('site-logo');
-                    if (logoLink) {
-                        const titleText = logoLink.querySelector('.mouse-gradient-text');
-                        logoLink.addEventListener('mousemove', (e) => {
-                            const rect = titleText.getBoundingClientRect();
-                            const x = e.clientX - rect.left;
-                            const y = e.clientY - rect.top;
-                            titleText.style.setProperty('--mouse-x', `${x}px`);
-                            titleText.style.setProperty('--mouse-y', `${y}px`);
-                        });
-                    }
-                });
-            </script>
         </div>
-        
-        <nav class="w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+
+        <nav class="w-full md:w-auto overflow-x-auto pb-1 md:pb-0" aria-label="主导航">
             <ul class="flex md:flex-wrap gap-6 text-lg font-bold items-center whitespace-nowrap">
-                <li><a href="<?php $this->options->siteUrl(); ?>" class="hover-underline-animation <?php if($this->is('index')): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>">首页</a></li>
+                <li><a href="<?php $this->options->siteUrl(); ?>" class="hover-underline-animation <?php if($this->is('index')): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"><?php echo get_theme_text('home', $this); ?></a></li>
                 <?php $this->widget('Widget_Contents_Page_List')->to($pages); ?>
                 <?php while($pages->next()): ?>
                 <li><a href="<?php $pages->permalink(); ?>" class="hover-underline-animation <?php if($this->is('page', $pages->slug)): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"><?php $pages->title(); ?></a></li>
