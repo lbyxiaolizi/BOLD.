@@ -2,6 +2,63 @@
 define('__TYPECHO_ROOT_DIR__', dirname(__DIR__));
 require_once dirname(__DIR__) . '/inc/helpers.php';
 
+class Helper {
+    public static $options;
+    public static function options() { return self::$options; }
+}
+
+class Typecho_Request {
+    public static $instance;
+    public $requestUri = '/';
+    public static function getInstance() {
+        if (!self::$instance) self::$instance = new self();
+        return self::$instance;
+    }
+    public function getRequestUri() { return $this->requestUri; }
+}
+
+class BoldTestQuery {
+    public $limitValue = null;
+    public function select(...$args) { return $this; }
+    public function from($table) { return $this; }
+    public function where(...$args) { return $this; }
+    public function order(...$args) { return $this; }
+    public function limit($limit) { $this->limitValue = intval($limit); return $this; }
+}
+
+class Typecho_Db {
+    const SORT_ASC = 'ASC';
+    const SORT_DESC = 'DESC';
+    public static $instance;
+    public $fetchQueue = array();
+    public $queries = array();
+    public static function get() {
+        if (!self::$instance) self::$instance = new self();
+        return self::$instance;
+    }
+    public function select(...$args) { return new BoldTestQuery(); }
+    public function fetchAll($query) {
+        $this->queries[] = $query;
+        return array_shift($this->fetchQueue) ?: array();
+    }
+}
+
+class Typecho_Widget {
+    public static function widget($name) {
+        return new class {
+            public function push($row) {
+                $row['permalink'] = '/post/' . intval($row['cid']);
+                return $row;
+            }
+        };
+    }
+}
+
+function get_theme_text($key, $archive = null) { return '[' . $key . ']'; }
+function bold_cid_is_protected($cid) {
+    return in_array(intval($cid), $GLOBALS['bold_test_protected_cids'] ?? array(), true);
+}
+
 function bold_test_same($expected, $actual, $message) {
     if ($expected === $actual) {
         return;
@@ -11,6 +68,31 @@ function bold_test_same($expected, $actual, $message) {
         . "\nActual:   " . var_export($actual, true) . "\n");
     exit(1);
 }
+
+Helper::$options = (object) array(
+    'timezone' => 0,
+    'time' => 2000,
+    'siteUrl' => 'https://example.test/blog/',
+);
+
+Typecho_Request::getInstance()->requestUri = '/blog/category/dev/?page=2&utm_source=ignored';
+$canonicalArchive = new class {
+    public $options;
+    public function __construct() { $this->options = Helper::options(); }
+    public function is($type) { return false; }
+    public function getArchiveUrl() { return 'https://example.test/blog/category/dev/?ref=ignored#top'; }
+};
+bold_test_same('https://example.test/blog/category/dev/?page=2', bold_canonical_url($canonicalArchive),
+    'Canonical URLs must prefer the core archive URL and preserve only page=N.');
+
+Typecho_Request::getInstance()->requestUri = '/blog/search/term/?q=term&page=3';
+$fallbackArchive = new class {
+    public $options;
+    public function __construct() { $this->options = Helper::options(); }
+    public function is($type) { return false; }
+};
+bold_test_same('https://example.test/blog/search/term/?page=3', bold_canonical_url($fallbackArchive),
+    'Canonical fallback must use site origin so a subdirectory is not duplicated.');
 
 $categories = array(
     array('mid' => 30, 'order' => 1, 'slug' => 'later-mid', 'parent' => 0),
@@ -62,5 +144,48 @@ foreach (array('$x$', '$x_i$', '$E=mc^2$', '$$x + y$$', "$$\nx + y\n$$", '\\(x +
     bold_test_same(true, bold_page_has_math($mathArchive),
         'Math delimiters must trigger MathJax: ' . $mathText);
 }
+
+$db = Typecho_Db::get();
+$db->fetchQueue = array(
+    array(array('cid' => 2), array('cid' => 3), array('cid' => 4), array('cid' => 5)),
+    array(
+        array('cid' => 2, 'title' => 'PRIVATE TITLE', 'created' => 1900),
+        array('cid' => 3, 'title' => 'Public A', 'created' => 1800),
+        array('cid' => 4, 'title' => 'PRIVATE TITLE TWO', 'created' => 1700),
+        array('cid' => 5, 'title' => 'Public B', 'created' => 1600),
+    ),
+);
+$GLOBALS['bold_test_protected_cids'] = array(2, 4);
+$relatedArchive = new class {
+    public $cid = 1;
+    public $tags = array(array('mid' => 10));
+};
+ob_start();
+getRelatedPosts($relatedArchive, 2);
+$relatedHtml = ob_get_clean();
+bold_test_same(false, strpos($relatedHtml, 'PRIVATE TITLE') !== false,
+    'Related posts must not expose protected titles.');
+bold_test_same(2, substr_count($relatedHtml, '<li>'),
+    'Related posts must overfetch and fill the requested public result limit.');
+bold_test_same(100, $db->queries[1]->limitValue,
+    'Related post content candidates must be overfetched before privacy filtering.');
+
+$firstAdjacentBatch = array();
+for ($cid = 100; $cid < 150; $cid++) {
+    $firstAdjacentBatch[] = array('cid' => $cid, 'title' => 'Private ' . $cid, 'created' => 1000 - $cid);
+}
+$db->fetchQueue = array(
+    $firstAdjacentBatch,
+    array(array('cid' => 151, 'title' => 'Public Previous', 'created' => 849)),
+);
+$GLOBALS['bold_test_protected_cids'] = range(100, 149);
+$adjacentArchive = new class { public $cid = 50; public $created = 1000; };
+bold_test_same(
+    array('title' => 'Public Previous', 'permalink' => '/post/151'),
+    bold_get_adjacent_public_post($adjacentArchive, 'previous'),
+    'Adjacent navigation must continue past a full batch of protected posts.'
+);
+bold_test_same(null, bold_get_adjacent_public_post($adjacentArchive, 'sideways'),
+    'Unknown adjacent navigation directions must fail closed.');
 
 fwrite(STDOUT, "helpers regression tests passed\n");

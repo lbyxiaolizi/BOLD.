@@ -34,6 +34,106 @@ function bold_mailto($value) {
 }
 
 /**
+ * 生成当前页面 canonical URL。非文章页面优先采用 Typecho 的归档 URL；
+ * 回退时只使用站点配置中的 origin 和当前请求路径，避免子目录重复拼接。
+ */
+function bold_canonical_url($archive) {
+    if ($archive->is('post') || $archive->is('page')) {
+        ob_start();
+        $archive->permalink();
+        return trim(ob_get_clean());
+    }
+
+    $requestUri = strval(Typecho_Request::getInstance()->getRequestUri());
+    $siteUrl = strval($archive->options->siteUrl ?? Helper::options()->siteUrl ?? '');
+    $siteParts = parse_url($siteUrl);
+    $origin = '';
+    if (is_array($siteParts) && !empty($siteParts['host'])) {
+        $scheme = strtolower(strval($siteParts['scheme'] ?? 'http'));
+        if ($scheme === 'http' || $scheme === 'https') {
+            $origin = $scheme . '://' . $siteParts['host'];
+            if (!empty($siteParts['port'])) {
+                $origin .= ':' . intval($siteParts['port']);
+            }
+        }
+    }
+
+    $archiveUrl = '';
+    try {
+        if (method_exists($archive, 'getArchiveUrl')) {
+            $archiveUrl = trim(strval($archive->getArchiveUrl()));
+        }
+    } catch (Throwable $e) {
+        $archiveUrl = '';
+    }
+
+    $archiveParts = $archiveUrl !== '' ? parse_url($archiveUrl) : false;
+    if (is_array($archiveParts)) {
+        $archiveScheme = strtolower(strval($archiveParts['scheme'] ?? ''));
+        if ($archiveScheme !== '' && $archiveScheme !== 'http' && $archiveScheme !== 'https') {
+            $archiveParts = false;
+        }
+    }
+
+    if (is_array($archiveParts)) {
+        if (!empty($archiveParts['host'])) {
+            $scheme = strtolower(strval($archiveParts['scheme'] ?? 'http'));
+            $canonical = $scheme . '://' . $archiveParts['host'];
+            if (!empty($archiveParts['port'])) {
+                $canonical .= ':' . intval($archiveParts['port']);
+            }
+            $canonical .= $archiveParts['path'] ?? '/';
+        } elseif ($origin !== '') {
+            $canonical = rtrim($origin, '/') . '/' . ltrim(strval($archiveParts['path'] ?? '/'), '/');
+        } else {
+            $canonical = strval($archiveParts['path'] ?? '/');
+        }
+    } else {
+        $requestPath = parse_url($requestUri, PHP_URL_PATH);
+        $requestPath = is_string($requestPath) && $requestPath !== '' ? $requestPath : '/';
+        $canonical = $origin !== ''
+            ? rtrim($origin, '/') . '/' . ltrim($requestPath, '/')
+            : $requestPath;
+    }
+
+    parse_str(strval(parse_url($requestUri, PHP_URL_QUERY) ?: ''), $queryArgs);
+    $page = isset($queryArgs['page']) && is_scalar($queryArgs['page'])
+        ? intval($queryArgs['page']) : 0;
+    if ($page > 0) {
+        $canonical .= '?page=' . $page;
+    }
+
+    return $canonical;
+}
+
+/**
+ * 列表内容是否可能因解锁 Cookie 而不同。配置型密码可直接判断；文章字段
+ * 密码只做一次轻量存在性查询。探测失败时按保密优先返回 true。
+ */
+function bold_listings_may_vary_by_unlock_cookie() {
+    static $varies = null;
+    if ($varies !== null) {
+        return $varies;
+    }
+
+    $options = Helper::options();
+    if (!empty($options->postPassword) || !empty(bold_get_protected_slugs())) {
+        return $varies = true;
+    }
+
+    try {
+        $field = Typecho_Db::get()->fetchRow(Typecho_Db::get()->select('cid')
+            ->from('table.fields')
+            ->where('name = ?', 'password')
+            ->where('str_value <> ?', '')
+            ->limit(1));
+        return $varies = !empty($field);
+    } catch (Throwable $e) {
+        return $varies = true;
+    }
+}
+
+/**
  * 当前文章/页面是否包含代码块（决定是否加载 Prism）。
  * 原文启发式覆盖 ```/~~~ 围栏与 HTML 写法；缩进式代码块等
  * 测不到的写法由渲染层兜底（bold_content_filter 在渲染结果中
@@ -191,11 +291,17 @@ function getReadingTime($archive) {
 /**
  * 获取相关文章。
  * 第一步查询加 LIMIT 防止 IN 列表无界；只取已发布、已到发布时间的文章；
+ * 候选必须经过统一保护判定，避免相关文章泄露加密文章的标题和链接。
  * permalink 直接使用 Widget 计算结果，不再维护手写伪静态回退。
  */
 function getRelatedPosts($archive, $limit = 3) {
     $emptyItem = '<li class="p-3 border-2 border-dashed border-black text-gray-500 text-sm bg-gray-50">'
         . get_theme_text('no_related', $archive) . '</li>';
+
+    $limit = max(0, intval($limit));
+    if ($limit === 0) {
+        return;
+    }
 
     $tags = $archive->tags;
     if (empty($tags)) {
@@ -228,20 +334,34 @@ function getRelatedPosts($archive, $limit = 3) {
         return;
     }
 
+    // relationships 查询最多返回 100 个 cid，这里取回全部候选再过滤，
+    // 否则前几个候选受保护时会少于调用方要求的数量。
     $related = $db->fetchAll($db->select()->from('table.contents')
         ->where('cid IN ?', $relatedCids)
         ->where('type = ?', 'post')
         ->where('status = ?', 'publish')
         ->where('created < ?', Helper::options()->time)
         ->order('created', Typecho_Db::SORT_DESC)
-        ->limit($limit));
+        ->limit(100));
 
     if (empty($related)) {
         echo $emptyItem;
         return;
     }
 
+    $rendered = 0;
     foreach ($related as $row) {
+        $cid = intval($row['cid'] ?? 0);
+        try {
+            $protected = $cid <= 0 || bold_cid_is_protected($cid);
+        } catch (Throwable $e) {
+            // 无法证明候选公开时失败即保密。
+            $protected = true;
+        }
+        if ($protected) {
+            continue;
+        }
+
         $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($row);
 
         $permalink = htmlspecialchars($post['permalink'] ?? '#', ENT_QUOTES, 'UTF-8');
@@ -254,6 +374,106 @@ function getRelatedPosts($archive, $limit = 3) {
                     <span class='text-xs font-mono whitespace-nowrap ml-2 bg-black text-white px-1'>{$date}</span>
                 </a>
               </li>";
+
+        $rendered++;
+        if ($rendered >= $limit) {
+            break;
+        }
+    }
+
+    if ($rendered === 0) {
+        echo $emptyItem;
+    }
+}
+
+/**
+ * 获取时间上相邻的公开文章。
+ *
+ * previous/prev 指更早的文章，next 指更新的文章。查询使用 created + cid
+ * 作为稳定游标并分批向外搜索，因此一批候选全受保护时仍能找到更远的公开文章。
+ *
+ * @return array|null ['title' => ..., 'permalink' => ...]
+ */
+function bold_get_adjacent_public_post($archive, $direction) {
+    $direction = strtolower(trim(strval($direction)));
+    if ($direction === 'previous') {
+        $direction = 'prev';
+    }
+    if ($direction !== 'prev' && $direction !== 'next') {
+        return null;
+    }
+
+    $currentCid = intval($archive->cid ?? 0);
+    $currentCreated = intval($archive->created ?? 0);
+    if ($currentCid <= 0 || $currentCreated <= 0) {
+        return null;
+    }
+
+    $db = Typecho_Db::get();
+    $before = $direction === 'prev';
+    $operator = $before ? '<' : '>';
+    $sort = $before ? Typecho_Db::SORT_DESC : Typecho_Db::SORT_ASC;
+    $cursorCreated = $currentCreated;
+    $cursorCid = $currentCid;
+
+    while (true) {
+        $rows = $db->fetchAll($db->select()->from('table.contents')
+            ->where('type = ?', 'post')
+            ->where('status = ?', 'publish')
+            ->where('created < ?', Helper::options()->time)
+            ->where(
+                '(created ' . $operator . ' ? OR (created = ? AND cid ' . $operator . ' ?))',
+                $cursorCreated,
+                $cursorCreated,
+                $cursorCid
+            )
+            ->order('created', $sort)
+            ->order('cid', $sort)
+            ->limit(50));
+
+        if (empty($rows)) {
+            return null;
+        }
+
+        foreach ($rows as $row) {
+            $cid = intval($row['cid'] ?? 0);
+            try {
+                $protected = $cid <= 0 || bold_cid_is_protected($cid);
+            } catch (Throwable $e) {
+                $protected = true;
+            }
+            if ($protected) {
+                continue;
+            }
+
+            try {
+                $post = Typecho_Widget::widget('Widget_Abstract_Contents')->push($row);
+            } catch (Throwable $e) {
+                continue;
+            }
+            $permalink = strval($post['permalink'] ?? '');
+            if ($permalink === '') {
+                continue;
+            }
+
+            return array(
+                'title' => strval($post['title'] ?? $row['title'] ?? ''),
+                'permalink' => $permalink,
+            );
+        }
+
+        if (count($rows) < 50) {
+            return null;
+        }
+
+        $last = $rows[count($rows) - 1];
+        $nextCreated = intval($last['created'] ?? 0);
+        $nextCid = intval($last['cid'] ?? 0);
+        if ($nextCreated === $cursorCreated && $nextCid === $cursorCid) {
+            return null;
+        }
+        $cursorCreated = $nextCreated;
+        $cursorCid = $nextCid;
     }
 }
 

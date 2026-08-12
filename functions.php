@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 具体实现按职责拆分在 inc/ 目录。
  */
 
-define('BOLD_VERSION', '1.3.0');
+define('BOLD_VERSION', '1.4.0');
 define('BOLD_UNLOCK_TTL', 604800);   // 解锁 Cookie 有效期（秒）= 7 天
 define('BOLD_READING_SPEED', 300);   // 阅读速度（字/分钟）
 define('BOLD_EXCERPT_LENGTH', 140);  // 默认摘要长度
@@ -183,6 +183,15 @@ class BoldHooks {
  * Typecho 在主题函数加载后、Feed 输出前提供的初始化时机。
  */
 function themeInit($archive) {
+    // 列表摘要和可见条目可能随访客的解锁 Cookie 改变。主题初始化发生在
+    // HTML 输出之前，此处尽早阻止 CDN/共享缓存混用已解锁与未解锁页面。
+    $isListing = $archive->is('index') || $archive->is('archive')
+        || $archive->is('category') || $archive->is('tag')
+        || $archive->is('search') || $archive->is('author') || $archive->is('date');
+    if (!bold_is_feed($archive) && $isListing && bold_listings_may_vary_by_unlock_cookie()) {
+        bold_private_cache_headers();
+    }
+
     bold_protect_feed_metadata($archive);
 }
 

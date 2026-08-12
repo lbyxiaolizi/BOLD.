@@ -469,16 +469,23 @@ function parseInlinePasswordContent($content, $archive) {
 
             $postField = 'inline_password_' . $blockId;
             $attempted = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST[$postField]);
+            $csrfContext = bold_password_csrf_context($archive, 'inline', $blockId);
+            $csrfValid = !$attempted || bold_validate_password_csrf(
+                $_POST['bold_password_csrf'] ?? '',
+                $csrfContext
+            );
             if ($attempted && !$isVerified) {
-                $inputPassword = strval($_POST[$postField]);
-                if (hash_equals($requiredPassword, $inputPassword)) {
-                    $token = bold_make_unlock_token($requiredPassword);
-                    if (bold_set_unlock_cookie($cookieName, $token, time() + BOLD_UNLOCK_TTL)) {
-                        bold_redirect_after_unlock($archive);
-                        $isVerified = true;
+                if ($csrfValid && is_string($_POST[$postField])) {
+                    $inputPassword = $_POST[$postField];
+                    if (hash_equals($requiredPassword, $inputPassword)) {
+                        $token = bold_make_unlock_token($requiredPassword);
+                        if (bold_set_unlock_cookie($cookieName, $token, time() + BOLD_UNLOCK_TTL)) {
+                            bold_redirect_after_unlock($archive);
+                            $isVerified = true;
+                        }
+                    } else {
+                        usleep(random_int(200000, 500000));
                     }
-                } else {
-                    usleep(random_int(200000, 500000));
                 }
             }
 
@@ -501,7 +508,9 @@ function parseInlinePasswordContent($content, $archive) {
                 $output .= '<div class="bg-red-100 border-2 border-red-500 text-red-700 px-3 py-2 mb-3 font-bold text-sm" role="alert">' . $errorMsg . '</div>';
             }
 
+            $csrfToken = bold_password_csrf_token($csrfContext);
             $output .= '<form method="post" class="w-full max-w-xs">
+                        <input type="hidden" name="bold_password_csrf" value="' . htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') . '">
                         <input type="password" name="' . $postField . '" placeholder="' . get_theme_text('inline_password_placeholder', $archive) . '"
                             aria-label="' . get_theme_text('inline_password_placeholder', $archive) . '"
                             class="w-full p-2 font-bold border-2 border-black focus:outline-none focus:border-pink-500 mb-3 text-center text-sm dark:bg-[#121212] dark:text-white dark:border-[#10b981]" required>
@@ -599,7 +608,7 @@ function bold_plain_text($archive, $length) {
  * 标签页/搜索页/作者页等所有列表场景不再泄露正文前 N 字。
  */
 function printExcerpt($archive, $length = BOLD_EXCERPT_LENGTH) {
-    if (isPasswordProtected($archive) && !isPasswordVerified($archive)) {
+    if (isPasswordProtected($archive, true) && !isPasswordVerified($archive, true)) {
         echo get_theme_text('protected_excerpt', $archive);
         return;
     }

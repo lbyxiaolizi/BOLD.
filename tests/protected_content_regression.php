@@ -50,6 +50,11 @@ function bold_check_unlock_token($token, $password) { return false; }
 function bold_make_unlock_token($password) { return 'unused'; }
 function bold_set_unlock_cookie($key, $value, $expires) { return false; }
 function bold_redirect_after_unlock($archive) {}
+function bold_password_csrf_context($archive, $purpose = 'page', $detail = '') {
+    return $purpose . '|' . intval($archive->cid ?? 0) . '|' . $detail;
+}
+function bold_validate_password_csrf($token, $context) { return false; }
+function bold_password_csrf_token($context) { return 'test-csrf-token'; }
 
 require_once dirname(__DIR__) . '/inc/content.php';
 

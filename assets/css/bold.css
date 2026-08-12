@@ -51,6 +51,116 @@ body {
     transition: background-color 0.3s, color 0.3s, background-image 0.3s;
 }
 
+body.modal-open {
+    overflow: hidden;
+}
+
+/* 键盘导航：跳过链接默认隐藏，聚焦时进入视口。 */
+.skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 200;
+    padding: 0.75rem 1rem;
+    border: 4px solid #000;
+    background: #facc15;
+    color: #000;
+    font-weight: 900;
+    transform: translateY(calc(-100% - 1rem));
+    transition: transform 0.15s ease;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 4px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.dark-mode :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline-color: #facc15;
+}
+
+#main-content:focus {
+    outline: none;
+}
+
+/* 主导航在无脚本时保持完整可见；仅 .has-js 会启用移动端折叠。 */
+.nav-toggle {
+    display: none;
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 3rem;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: 4px 4px 0 0 var(--border-color);
+}
+
+.has-js .nav-toggle {
+    display: inline-flex;
+}
+
+.nav-toggle-close,
+.nav-toggle[aria-expanded="true"] .nav-toggle-open {
+    display: none;
+}
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-close {
+    display: block;
+}
+
+@media (max-width: 767px) {
+    .site-header {
+        padding-top: 1.25rem !important;
+        padding-bottom: 1.25rem !important;
+    }
+
+    .primary-navigation ul {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        white-space: normal;
+        border-top: 2px solid var(--border-color);
+    }
+
+    .primary-navigation a {
+        display: block;
+        padding: 0.8rem 0.25rem;
+        border-bottom: 2px solid var(--border-color);
+        overflow-wrap: anywhere;
+    }
+
+    .has-js .primary-navigation {
+        max-height: 0;
+        overflow: hidden;
+        visibility: hidden;
+        opacity: 0;
+        padding-bottom: 0 !important;
+        transition: max-height 0.22s ease, opacity 0.18s ease, visibility 0s linear 0.22s;
+    }
+
+    .has-js .primary-navigation.is-open {
+        max-height: min(65vh, 32rem);
+        overflow-y: auto;
+        visibility: visible;
+        opacity: 1;
+        padding-bottom: 0.25rem !important;
+        transition: max-height 0.22s ease, opacity 0.18s ease, visibility 0s;
+    }
+}
+
+@media (min-width: 768px) {
+    .nav-toggle {
+        display: none !important;
+    }
+}
+
 /* --- 强制 Tailwind 类适配 (Universal Override) --- */
 
 /* 背景适配 */
@@ -505,6 +615,35 @@ div.code-toolbar > .toolbar button:hover {
 .hover-underline-animation:hover::after { transform: scaleX(1); transform-origin: bottom left; }
 
 /* TOC Active Link */
+.toc-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.toc-panel-toggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: 3px 3px 0 0 var(--border-color);
+}
+
+.toc-panel-toggle svg {
+    transition: transform 0.18s ease;
+}
+
+.toc-panel-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
 .toc-container .toc-list {
     margin: 0;
     padding-left: 0;
@@ -598,10 +737,6 @@ div.code-toolbar > .toolbar button:hover {
 
 /* --- TOC Sticky (目录悬浮) --- */
 #toc-wrapper {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 160px; /* 避开顶部导航栏的高度 */
-    z-index: 30;
     background-color: var(--bg-card);
 }
 
@@ -614,6 +749,107 @@ div.code-toolbar > .toolbar button:hover {
     scrollbar-width: none;
 }
 .toc-container::-webkit-scrollbar { display: none; }
+
+.mobile-toc-slot:empty {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobile-toc-slot #toc-wrapper {
+        position: static;
+        width: 100%;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 4px solid var(--border-color);
+        background: #fefce8;
+    }
+
+    .dark-mode .mobile-toc-slot #toc-wrapper {
+        background: #1e1e1e;
+    }
+
+    .mobile-toc-slot .toc-panel-toggle {
+        display: inline-flex;
+    }
+
+    .mobile-toc-slot #toc-wrapper.toc-panel-collapsed .toc-container {
+        display: none;
+    }
+
+    .mobile-toc-slot .toc-container {
+        max-height: min(55vh, 24rem);
+    }
+}
+
+@media (min-width: 768px) {
+    #toc-wrapper {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 160px;
+        z-index: 30;
+    }
+}
+
+/* ====== 文章操作、连续阅读与打赏弹窗 ====== */
+.article-actions button {
+    min-height: 2.75rem;
+}
+
+#copy-article-link.is-copied {
+    background: #16a34a;
+    color: #fff;
+}
+
+.post-navigation-link {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem;
+    border: 4px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: 4px 4px 0 0 var(--border-color);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.post-navigation-link:hover {
+    background: #fef08a;
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 0 var(--border-color);
+}
+
+.dark-mode .post-navigation-link:hover {
+    background: #064e3b;
+}
+
+.post-navigation-link span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 900;
+}
+
+.post-navigation-link strong {
+    overflow-wrap: anywhere;
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+.post-navigation-next {
+    text-align: right;
+}
+
+.reward-modal.hidden {
+    display: none !important;
+}
+
+.reward-dialog {
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.reward-options {
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
 
 /* ====== 密码保护表单 ====== */
 .password-form-container {

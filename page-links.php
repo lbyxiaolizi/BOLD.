@@ -24,6 +24,10 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
             </p>
         </header>
 
+        <?php if (!$needsPassword): ?>
+        <div id="mobile-toc-slot" class="mobile-toc-slot"></div>
+        <?php endif; ?>
+
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none links-grid dark:prose-invert">
             <?php if ($needsPassword): ?>
                 <?php renderPasswordForm($this, $passwordError); ?>

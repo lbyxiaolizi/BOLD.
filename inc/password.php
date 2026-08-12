@@ -89,6 +89,140 @@ function bold_set_unlock_cookie($key, $value, $expires) {
 }
 
 /**
+ * 密码表单使用匿名双提交 Cookie。Cookie 本身不可由脚本读取，表单仅携带
+ * 绑定当前页面上下文的 HMAC，避免第三方站点构造有效的解锁 POST。
+ */
+function bold_password_csrf_cookie_name() {
+    return 'bold_password_csrf';
+}
+
+function bold_password_csrf_cookie($issueOnGet = false) {
+    $cookieName = bold_password_csrf_cookie_name();
+    $cookieValue = Typecho_Cookie::get($cookieName, '');
+    $nonce = is_string($cookieValue) ? $cookieValue : '';
+    if (preg_match('/\A[a-f0-9]{64}\z/', $nonce)) {
+        return $nonce;
+    }
+
+    if (!$issueOnGet || strtoupper(strval($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
+        return null;
+    }
+
+    try {
+        $nonce = bin2hex(random_bytes(32));
+    } catch (Throwable $e) {
+        return null;
+    }
+
+    return bold_set_unlock_cookie($cookieName, $nonce, time() + BOLD_UNLOCK_TTL)
+        ? $nonce
+        : null;
+}
+
+function bold_ensure_password_csrf_cookie() {
+    return bold_password_csrf_cookie(true);
+}
+
+/**
+ * 安全调用 Widget_Archive::is()。测试替身和部分内容 Widget 不提供该方法。
+ */
+function bold_archive_is($archive, $type) {
+    if (!is_object($archive) || !method_exists($archive, 'is')) {
+        return false;
+    }
+
+    try {
+        return !!$archive->is($type);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function bold_category_archive_slug($archive) {
+    if (is_object($archive) && method_exists($archive, 'getArchiveSlug')) {
+        try {
+            $slug = trim(strval($archive->getArchiveSlug()));
+            if ($slug !== '') {
+                return $slug;
+            }
+        } catch (Throwable $e) {
+            // 继续使用请求参数兼容旧版 Typecho。
+        }
+    }
+
+    if (isset($archive->request) && !empty($archive->request->slug)) {
+        return trim(strval($archive->request->slug));
+    }
+    if (isset($archive->parameter) && !empty($archive->parameter->slug)) {
+        return trim(strval($archive->parameter->slug));
+    }
+
+    $resolvedSlug = trim(strval(resolveCategorySlugFromRequest()));
+    if ($resolvedSlug !== '') {
+        return $resolvedSlug;
+    }
+
+    // 最后兼容不提供 getArchiveSlug() 的旧 Widget/测试替身。
+    return isset($archive->slug) ? trim(strval($archive->slug)) : '';
+}
+
+/**
+ * 构造稳定的页面身份。分类归档不能使用当前结果行 cid，否则翻页或迭代会
+ * 改变 CSRF 上下文；单篇内容优先绑定 cid，其余归档绑定请求路径。
+ */
+function bold_password_archive_identity($archive) {
+    if (bold_archive_is($archive, 'category')) {
+        return 'category:' . bold_category_archive_slug($archive);
+    }
+
+    $cid = intval($archive->cid ?? 0);
+    if ($cid > 0) {
+        return 'cid:' . $cid;
+    }
+
+    $path = '/';
+    try {
+        $path = strval(Typecho_Request::getInstance()->getPathInfo());
+    } catch (Throwable $e) {
+        $path = strval($_SERVER['REQUEST_URI'] ?? '/');
+    }
+    return 'archive:' . hash('sha256', $path);
+}
+
+function bold_password_csrf_context($archive, $purpose = 'page', $detail = '') {
+    return 'password|' . strval($purpose) . '|'
+        . bold_password_archive_identity($archive) . '|' . strval($detail);
+}
+
+function bold_password_csrf_token($context) {
+    $nonce = bold_password_csrf_cookie(true);
+    if ($nonce === null) {
+        return '';
+    }
+
+    return 'v1.' . hash_hmac(
+        'sha256',
+        'csrf|' . $nonce . '|' . strval($context),
+        getBoldSecretSalt()
+    );
+}
+
+function bold_validate_password_csrf($token, $context) {
+    $nonce = bold_password_csrf_cookie(false);
+    if ($nonce === null || !is_string($token)
+        || !preg_match('/\Av1\.([a-f0-9]{64})\z/', $token, $matches)) {
+        return false;
+    }
+
+    $expected = hash_hmac(
+        'sha256',
+        'csrf|' . $nonce . '|' . strval($context),
+        getBoldSecretSalt()
+    );
+    return hash_equals($expected, $matches[1]);
+}
+
+/**
  * 密码 POST 成功后仅重定向到当前站内 path + query，避免重复提交。
  */
 function bold_redirect_after_unlock($archive) {
@@ -298,19 +432,42 @@ function bold_get_protected_slugs() {
  * 某个受保护分类实际所需的密码；不受保护返回 null
  */
 function bold_category_password($slug) {
+    $requirement = bold_category_password_requirement($slug);
+    return $requirement === null ? null : $requirement['password'];
+}
+
+function bold_category_password_requirement($slug) {
     if (!in_array($slug, bold_get_protected_slugs())) {
         return null;
     }
+
     $categoryPasswords = parseCategoryPasswords();
     if (!empty($categoryPasswords[$slug])) {
-        return $categoryPasswords[$slug];
+        return array(
+            'password' => $categoryPasswords[$slug],
+            'source' => 'category',
+            'id' => $slug,
+            'cookie' => bold_category_unlock_cookie_name($slug)
+        );
     }
+
     $options = Helper::options();
     if (!empty($options->postPassword)) {
-        return $options->postPassword;
+        return array(
+            'password' => strval($options->postPassword),
+            'source' => 'global',
+            'id' => 'global',
+            'cookie' => 'bold_password_verified'
+        );
     }
+
     // 未配置任何密码时保持不可解锁，且该值不能由公开站点信息计算。
-    return hash_hmac('sha256', 'unconfigured-category|' . $slug, getBoldSecretSalt());
+    return array(
+        'password' => hash_hmac('sha256', 'unconfigured-category|' . $slug, getBoldSecretSalt()),
+        'source' => 'category',
+        'id' => $slug,
+        'cookie' => bold_category_unlock_cookie_name($slug)
+    );
 }
 
 /**
@@ -321,15 +478,14 @@ function bold_is_category_unlocked($slug) {
     if ($user->hasLogin() && $user->pass('editor', true)) {
         return true;
     }
-    $password = bold_category_password($slug);
-    if ($password === null) {
+    $requirement = bold_category_password_requirement($slug);
+    if ($requirement === null) {
         return true;
     }
-    $cookieName = 'bold_category_verified_' . sanitizeCategorySlugForCookie($slug);
-    if (bold_check_unlock_token(Typecho_Cookie::get($cookieName), $password)) {
-        return true;
-    }
-    return bold_check_unlock_token(Typecho_Cookie::get('bold_password_verified'), $password);
+    return bold_check_unlock_token(
+        Typecho_Cookie::get($requirement['cookie']),
+        $requirement['password']
+    );
 }
 
 /**
@@ -348,74 +504,112 @@ function bold_entry_password($archive) {
 }
 
 /**
- * 获取文章/分类所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
- * @return string|null 不需要密码时返回 null
+ * 默认只在单篇文章、独立页面和 Feed 条目上读取当前行的字段密码。
+ * 分类/搜索等归档的 archive 对象会随结果集移动，不能把当前行字段当成
+ * 整个归档页密码；列表摘要可通过显式参数要求检查该条目。
  */
-function getRequiredPassword($archive) {
-    $options = Helper::options();
-
-    // 当前内容行的自定义字段密码在 single、feed 与所有列表场景都生效。
-    $entryPassword = bold_entry_password($archive);
-    if ($entryPassword !== null) {
-        return $entryPassword;
+function bold_should_check_entry_password($archive) {
+    if (function_exists('bold_is_feed') && bold_is_feed($archive)) {
+        return true;
     }
 
-    $categorySlug = getProtectedCategorySlug($archive);
+    if (bold_archive_is($archive, 'category')) {
+        return false;
+    }
+
+    if (bold_archive_is($archive, 'single')
+        || bold_archive_is($archive, 'post')
+        || bold_archive_is($archive, 'page')) {
+        return true;
+    }
+
+    // 非 Archive 内容 Widget 没有 is()，保持原有的单条内容行为。
+    return !is_object($archive) || !method_exists($archive, 'is');
+}
+
+function bold_entry_unlock_cookie_name($cid) {
+    return 'bold_entry_verified_' . max(0, intval($cid));
+}
+
+function bold_category_unlock_cookie_name($slug) {
+    return 'bold_category_verified_' . sanitizeCategorySlugForCookie($slug);
+}
+
+/**
+ * 返回密码及其授权作用域。作用域决定唯一的 Cookie，避免两个独立文章密码
+ * 或文章密码与分类密码互相覆盖。
+ */
+function bold_password_requirement($archive, $includeEntryPassword = null) {
+    if ($includeEntryPassword === null) {
+        $includeEntryPassword = bold_should_check_entry_password($archive);
+    }
+
+    if ($includeEntryPassword) {
+        $entryPassword = bold_entry_password($archive);
+        if ($entryPassword !== null) {
+            $cid = intval($archive->cid ?? 0);
+            return array(
+                'password' => $entryPassword,
+                'source' => 'entry',
+                'id' => $cid,
+                'cookie' => bold_entry_unlock_cookie_name($cid)
+            );
+        }
+    }
+
+    $categorySlug = getProtectedCategorySlug($archive, $includeEntryPassword);
     if ($categorySlug !== null) {
-        return bold_category_password($categorySlug);
+        return bold_category_password_requirement($categorySlug);
     }
 
-    if (!empty($options->postPassword)) {
-        return $options->postPassword;
+    $globalPassword = strval(Helper::options()->postPassword ?? '');
+    if ($globalPassword !== '') {
+        return array(
+            'password' => $globalPassword,
+            'source' => 'global',
+            'id' => 'global',
+            'cookie' => 'bold_password_verified'
+        );
     }
 
     return null;
 }
 
 /**
+ * 获取文章/分类所需的密码（优先级：文章独立密码 > 分类独立密码 > 全站密码）
+ * @return string|null 不需要密码时返回 null
+ */
+function getRequiredPassword($archive, $includeEntryPassword = null) {
+    $requirement = bold_password_requirement($archive, $includeEntryPassword);
+    return $requirement === null ? null : $requirement['password'];
+}
+
+/**
  * 获取文章所属的受保护分类slug（支持文章页和分类页）
  * @return string|null
  */
-function getProtectedCategorySlug($archive) {
+function getProtectedCategorySlug($archive, $includeEntryCategories = null) {
+    if ($includeEntryCategories === null) {
+        $includeEntryCategories = bold_should_check_entry_password($archive);
+    }
+
     $protectedSlugs = bold_get_protected_slugs();
     if (empty($protectedSlugs)) {
         return null;
     }
 
     // 分类页：检查当前分类是否需要密码保护
-    if ($archive->is('category')) {
-        $candidateSlugs = array();
-
-        if (isset($archive->slug) && !empty($archive->slug)) {
-            $candidateSlugs[] = $archive->slug;
-        }
-        if (isset($archive->request) && !empty($archive->request->slug)) {
-            $candidateSlugs[] = $archive->request->slug;
-        }
-        if (isset($archive->parameter) && !empty($archive->parameter->slug)) {
-            $candidateSlugs[] = $archive->parameter->slug;
-        }
-        $resolvedSlug = resolveCategorySlugFromRequest();
-        if (!empty($resolvedSlug)) {
-            $candidateSlugs[] = $resolvedSlug;
+    if (bold_archive_is($archive, 'category')) {
+        $currentSlug = bold_category_archive_slug($archive);
+        if ($currentSlug !== '' && in_array($currentSlug, $protectedSlugs)) {
+            return $currentSlug;
         }
 
-        foreach ($candidateSlugs as $currentSlug) {
-            $currentSlug = trim($currentSlug);
-            if (!empty($currentSlug) && in_array($currentSlug, $protectedSlugs)) {
-                return $currentSlug;
-            }
+        // 页面级检查不能退回当前结果行；显式的单条摘要检查则必须继续
+        // 检查该文章的其它分类，防止跨分类文章从公开归档泄露摘要。
+        if (!$includeEntryCategories) {
+            return null;
         }
-
-        if (!empty($archive->categories)) {
-            foreach ($archive->categories as $category) {
-                if (!empty($category['slug']) && in_array($category['slug'], $protectedSlugs)) {
-                    return $category['slug'];
-                }
-            }
-        }
-
-        return null;
     }
 
     // 文章所属分类（列表页与文章页都检测，避免摘要泄露）
@@ -433,8 +627,8 @@ function getProtectedCategorySlug($archive) {
 /**
  * 检查文章是否需要密码保护
  */
-function isPasswordProtected($archive) {
-    if (getRequiredPassword($archive) === null) {
+function isPasswordProtected($archive, $includeEntryPassword = null) {
+    if (getRequiredPassword($archive, $includeEntryPassword) === null) {
         return false;
     }
     // HTML 页面的展示取决于访客 Cookie，禁止共享缓存；
@@ -497,26 +691,21 @@ function bold_cid_is_protected($cid) {
  * 检查密码是否已验证。
  * 登录用户仅编辑及以上直接放行——订阅者等低权限账号不再绕过密码。
  */
-function isPasswordVerified($archive) {
+function isPasswordVerified($archive, $includeEntryPassword = null) {
     $user = Typecho_Widget::widget('Widget_User');
     if ($user->hasLogin() && $user->pass('editor', true)) {
         return true;
     }
 
-    $requiredPassword = getRequiredPassword($archive);
-    if ($requiredPassword === null) {
+    $requirement = bold_password_requirement($archive, $includeEntryPassword);
+    if ($requirement === null) {
         return true;
     }
 
-    $categorySlug = getProtectedCategorySlug($archive);
-    if ($categorySlug !== null) {
-        $cookieName = 'bold_category_verified_' . sanitizeCategorySlugForCookie($categorySlug);
-        if (bold_check_unlock_token(Typecho_Cookie::get($cookieName), $requiredPassword)) {
-            return true;
-        }
-    }
-
-    return bold_check_unlock_token(Typecho_Cookie::get('bold_password_verified'), $requiredPassword);
+    return bold_check_unlock_token(
+        Typecho_Cookie::get($requirement['cookie']),
+        $requirement['password']
+    );
 }
 
 /**
@@ -524,13 +713,27 @@ function isPasswordVerified($archive) {
  * @return bool true 表示本次提交验证失败（模板据此显示错误提示）
  */
 function handlePasswordVerification($archive) {
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['bold_password'])) {
+    $requestMethod = strtoupper(strval($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if ($requestMethod === 'GET') {
+        bold_ensure_password_csrf_cookie();
+        return false;
+    }
+    if ($requestMethod !== 'POST' || !isset($_POST['bold_password'])) {
         return false;
     }
 
     bold_private_cache_headers();
-    $inputPassword = strval($_POST['bold_password']);
-    $correctPassword = getRequiredPassword($archive);
+    if (!is_string($_POST['bold_password'])) {
+        return true;
+    }
+    $inputPassword = $_POST['bold_password'];
+    $requirement = bold_password_requirement($archive);
+    $correctPassword = $requirement === null ? null : $requirement['password'];
+
+    $csrfContext = bold_password_csrf_context($archive, 'page');
+    if (!bold_validate_password_csrf($_POST['bold_password_csrf'] ?? '', $csrfContext)) {
+        return true;
+    }
 
     // Referer 仅在「存在且主机不匹配」时拒绝；浏览器隐私策略
     // （Referrer-Policy: no-referrer 等）不携带 Referer 时不应锁死用户
@@ -545,14 +748,11 @@ function handlePasswordVerification($archive) {
 
     if (!empty($correctPassword) && hash_equals(strval($correctPassword), $inputPassword)) {
         $token = bold_make_unlock_token($correctPassword);
-        $categorySlug = getProtectedCategorySlug($archive);
-
-        if ($categorySlug !== null) {
-            $cookieName = 'bold_category_verified_' . sanitizeCategorySlugForCookie($categorySlug);
-            $cookieSet = bold_set_unlock_cookie($cookieName, $token, time() + BOLD_UNLOCK_TTL);
-        } else {
-            $cookieSet = bold_set_unlock_cookie('bold_password_verified', $token, time() + BOLD_UNLOCK_TTL);
-        }
+        $cookieSet = bold_set_unlock_cookie(
+            $requirement['cookie'],
+            $token,
+            time() + BOLD_UNLOCK_TTL
+        );
 
         if ($cookieSet) {
             bold_redirect_after_unlock($archive);
@@ -587,6 +787,7 @@ function renderPasswordForm($archive, $hasError = false) {
     } else {
         $desc = get_theme_text('password_protected_content', $archive);
     }
+    $csrfToken = bold_password_csrf_token(bold_password_csrf_context($archive, 'page'));
     ?>
     <div class="password-form-container my-8">
         <div class="password-form-inner flex flex-col items-center justify-center text-center p-6 md:p-10">
@@ -601,6 +802,7 @@ function renderPasswordForm($archive, $hasError = false) {
             <?php endif; ?>
 
             <form method="post" class="w-full max-w-sm">
+                <input type="hidden" name="bold_password_csrf" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                 <input type="password" name="bold_password" placeholder="<?php echo get_theme_text('password_placeholder', $archive); ?>"
                     aria-label="<?php echo get_theme_text('password_placeholder', $archive); ?>"
                     class="w-full p-3 font-bold border-4 border-black focus:outline-none focus:border-pink-500 mb-4 text-center dark:bg-[#121212] dark:text-white dark:border-[#10b981]" required>

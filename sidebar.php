@@ -31,11 +31,17 @@
     <!-- 2. 文章目录 (TOC) - 仅在文章或独立页显示 -->
     <?php if ($this->is('post') || $this->is('page')): ?>
     <div id="toc-wrapper" class="p-6 md:p-10 border-b-4 border-black hidden">
-        <h3 class="font-black text-xl mb-4 uppercase flex items-center gap-2">
-            <div class="w-4 h-4 bg-pink-500 border-2 border-black" aria-hidden="true"></div> <?php echo get_theme_text('toc', $this); ?>
-        </h3>
+        <div class="toc-heading-row">
+            <h3 class="font-black text-xl uppercase flex items-center gap-2">
+                <span class="w-4 h-4 bg-pink-500 border-2 border-black" aria-hidden="true"></span> <?php echo get_theme_text('toc', $this); ?>
+            </h3>
+            <button type="button" id="toc-panel-toggle" class="toc-panel-toggle" aria-expanded="false" aria-controls="toc-navigation">
+                <span class="sr-only"><?php echo get_theme_text('toggle_toc', $this); ?></span>
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="m6 9 6 6 6-6"></path></svg>
+            </button>
+        </div>
         <!-- 目录内容生成于此 -->
-        <nav class="toc-container font-bold text-sm" aria-label="<?php echo get_theme_text('toc', $this); ?>"></nav>
+        <nav id="toc-navigation" class="toc-container font-bold text-sm" aria-label="<?php echo get_theme_text('toc', $this); ?>"></nav>
     </div>
     <?php endif; ?>
 

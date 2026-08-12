@@ -4,11 +4,13 @@
  *
  * @package BOLD Theme
  * @author lbyxiaolizi
- * @version 1.3
+ * @version 1.4
  * @link https://blog.vh.gs
  */
 
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
+// 摘要可随文章解锁 Cookie 改变，必须在 header.php 输出前设置缓存策略。
+if (bold_listings_may_vary_by_unlock_cookie()) bold_private_cache_headers();
 $this->need('header.php');
 
 // 定义文章卡片悬停颜色池
@@ -37,7 +39,7 @@ $hoverColors = [
             // 随机卡片悬停颜色
             $randomHover = $hoverColors[array_rand($hoverColors)];
         ?>
-        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group cursor-pointer relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
+        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <span class="absolute -right-2 -bottom-4 md:-right-4 md:-bottom-10 text-[5rem] md:text-[10rem] font-black text-gray-100 opacity-50 z-0 pointer-events-none group-hover:text-white/50 transition-colors leading-none dark:text-[#1e1e1e] dark:group-hover:text-[#10b981]/20" aria-hidden="true">
                 <?php $this->sequence(); ?>
             </span>

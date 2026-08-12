@@ -3,6 +3,7 @@
 // 在输出 header 前完成 Cookie 与重定向处理。
 $passwordError = handlePasswordVerification($this);
 $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
+$hasReward = !empty($this->options->wechatQrUrl) || !empty($this->options->alipayQrUrl);
 ?>
 <?php $this->need('header.php'); ?>
 
@@ -23,9 +24,11 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
                  <span class="uppercase flex items-center gap-1 dark:text-[#e5e5e5]">
                      By <a href="<?php $this->author->permalink(); ?>" class="border-b-2 border-transparent hover:border-black dark:hover:border-[#10b981]"><?php $this->author(); ?></a>
                  </span>
+                 <?php if (!$needsPassword): ?>
                  <span class="uppercase text-gray-500 flex items-center gap-1 dark:text-[#a3a3a3]">
                      <?php getPostViews($this); ?> Views
                  </span>
+                 <?php endif; ?>
                  <span class="uppercase text-pink-600 flex items-center gap-1 dark:text-[#10b981]">
                      <?php echo getReadingTime($this); ?> MIN READ
                  </span>
@@ -42,6 +45,7 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
         </div>
         <?php else: ?>
         <!-- 正常内容 -->
+        <div id="mobile-toc-slot" class="mobile-toc-slot"></div>
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none prose-strong:font-black prose-strong:bg-pink-200 prose-strong:px-1 dark:prose-invert">
             <?php
                 $content = $this->content;
@@ -63,48 +67,73 @@ $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
                         </div>
                     </div>
 
-                    <button onclick="document.getElementById('reward-modal').classList.remove('hidden')" class="bg-pink-500 text-white px-6 py-2 font-black uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:translate-y-1 hover:shadow-none transition-all dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:hover:shadow-none flex-shrink-0">
+                    <div class="article-actions flex flex-wrap justify-center md:justify-end gap-3 flex-shrink-0">
+                    <button type="button" id="copy-article-link" data-copy-url="<?php $this->permalink(); ?>" data-copy-success="<?php echo htmlspecialchars(get_theme_text('link_copied', $this), ENT_QUOTES, 'UTF-8'); ?>" data-copy-failure="<?php echo htmlspecialchars(get_theme_text('copy_failed', $this), ENT_QUOTES, 'UTF-8'); ?>" class="bg-white text-black px-5 py-2 font-black uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:translate-y-1 hover:shadow-none transition-all dark:bg-[#121212] dark:text-[#10b981] dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:hover:shadow-none">
+                        <?php echo get_theme_text('copy_link', $this); ?>
+                    </button>
+                    <?php if ($hasReward): ?>
+                    <button type="button" id="reward-open" aria-haspopup="dialog" aria-controls="reward-modal" class="bg-pink-500 text-white px-6 py-2 font-black uppercase border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:translate-y-1 hover:shadow-none transition-all dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981] dark:hover:shadow-none">
                         <?php echo get_theme_text('reward', $this); ?>
                     </button>
+                    <?php endif; ?>
+                    </div>
+                    <span id="copy-link-status" class="sr-only" role="status" aria-live="polite"></span>
                 </div>
             </div>
         </div>
 
-        <div id="reward-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="this.classList.add('hidden')" role="dialog" aria-modal="true" aria-label="打赏二维码">
-            <div class="bg-white border-4 border-black p-8 max-w-sm w-full text-center relative shadow-[8px_8px_0px_0px_#db2777] dark:bg-[#121212] dark:border-[#10b981] dark:shadow-[8px_8px_0px_0px_#10b981]" onclick="event.stopPropagation()">
-                <h3 class="text-2xl font-black uppercase mb-6 dark:text-white">THANK YOU!</h3>
-                <div class="grid grid-cols-2 gap-4 mb-6">
+        <?php if ($hasReward): ?>
+        <div id="reward-modal" class="reward-modal fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="reward-title" aria-hidden="true">
+            <div class="reward-dialog bg-white border-4 border-black p-8 max-w-sm w-full text-center relative shadow-[8px_8px_0px_0px_#db2777] dark:bg-[#121212] dark:border-[#10b981] dark:shadow-[8px_8px_0px_0px_#10b981]">
+                <h3 id="reward-title" class="text-2xl font-black uppercase mb-6 dark:text-white"><?php echo get_theme_text('reward_thanks', $this); ?></h3>
+                <div class="reward-options grid gap-4 mb-6">
+                    <?php if ($this->options->wechatQrUrl): ?>
                     <div class="text-center">
-                        <?php if ($this->options->wechatQrUrl): ?>
                         <img src="<?php $this->options->wechatQrUrl(); ?>" alt="WeChat QR" loading="lazy" decoding="async" class="w-full aspect-square object-contain bg-gray-200 mb-2 dark:bg-[#1e1e1e]">
-                        <?php else: ?>
-                        <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
-                            [微信二维码]
-                        </div>
-                        <?php endif; ?>
                         <span class="font-bold text-sm dark:text-gray-300">WeChat</span>
                     </div>
+                    <?php endif; ?>
+                    <?php if ($this->options->alipayQrUrl): ?>
                     <div class="text-center">
-                        <?php if ($this->options->alipayQrUrl): ?>
                         <img src="<?php $this->options->alipayQrUrl(); ?>" alt="Alipay QR" loading="lazy" decoding="async" class="w-full aspect-square object-contain bg-gray-200 mb-2 dark:bg-[#1e1e1e]">
-                        <?php else: ?>
-                        <div class="w-full aspect-square bg-gray-200 mb-2 flex items-center justify-center text-xs text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
-                            [支付宝二维码]
-                        </div>
-                        <?php endif; ?>
                         <span class="font-bold text-sm dark:text-gray-300">Alipay</span>
                     </div>
+                    <?php endif; ?>
                 </div>
-                <button onclick="document.getElementById('reward-modal').classList.add('hidden')" class="w-full bg-black text-white py-3 font-bold border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors dark:bg-[#10b981] dark:text-black dark:hover:bg-black dark:hover:text-[#10b981] dark:hover:border-[#10b981]">
+                <button type="button" id="reward-close" class="w-full bg-black text-white py-3 font-bold border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors dark:bg-[#10b981] dark:text-black dark:hover:bg-black dark:hover:text-[#10b981] dark:hover:border-[#10b981]">
                     <?php echo get_theme_text('close', $this); ?>
                 </button>
             </div>
         </div>
+        <?php endif; ?>
 
         <div class="px-6 md:px-10 pb-10 flex flex-wrap gap-2">
             <span class="font-black mr-2 text-lg dark:text-white"><?php echo get_theme_text('tags', $this); ?>:</span>
             <?php $this->tags(' ', true, get_theme_text('no_tags', $this)); ?>
         </div>
+
+        <?php
+        $previousPost = bold_get_adjacent_public_post($this, 'previous');
+        $nextPost = bold_get_adjacent_public_post($this, 'next');
+        ?>
+        <?php if ($previousPost || $nextPost): ?>
+        <nav class="post-navigation px-6 md:px-10 pb-10" aria-label="<?php echo get_theme_text('post_navigation', $this); ?>">
+            <div class="grid md:grid-cols-2 gap-4">
+                <?php if ($previousPost): ?>
+                <a href="<?php echo htmlspecialchars($previousPost['permalink'], ENT_QUOTES, 'UTF-8'); ?>" class="post-navigation-link post-navigation-previous">
+                    <span><?php echo get_theme_text('previous_post', $this); ?></span>
+                    <strong><?php echo htmlspecialchars($previousPost['title'], ENT_QUOTES, 'UTF-8', false); ?></strong>
+                </a>
+                <?php else: ?><span aria-hidden="true"></span><?php endif; ?>
+                <?php if ($nextPost): ?>
+                <a href="<?php echo htmlspecialchars($nextPost['permalink'], ENT_QUOTES, 'UTF-8'); ?>" class="post-navigation-link post-navigation-next">
+                    <span><?php echo get_theme_text('next_post', $this); ?></span>
+                    <strong><?php echo htmlspecialchars($nextPost['title'], ENT_QUOTES, 'UTF-8', false); ?></strong>
+                </a>
+                <?php endif; ?>
+            </div>
+        </nav>
+        <?php endif; ?>
 
         <div class="px-6 md:px-10 pb-10">
             <div class="border-4 border-black p-6 bg-white shadow-[4px_4px_0px_0px_#000] dark:bg-[#1e1e1e] dark:border-[#10b981] dark:shadow-[4px_4px_0px_0px_#10b981]">

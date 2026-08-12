@@ -2,22 +2,7 @@
 <?php
 $_boldIsArticle = $this->is('post') || $this->is('page');
 
-// 当前页面规范化 URL：
-// 文章/页面用 permalink；其余页面基于 siteUrl + 路径生成，
-// 不再信任 HTTP_HOST / 原样拼接查询串（仅保留分页参数）
-if ($_boldIsArticle) {
-    ob_start();
-    $this->permalink();
-    $_boldCurrentUrl = ob_get_clean();
-} else {
-    $_boldRequestUri = Typecho_Request::getInstance()->getRequestUri();
-    $_boldPath = parse_url($_boldRequestUri, PHP_URL_PATH);
-    $_boldCurrentUrl = rtrim($this->options->siteUrl, '/') . ($_boldPath !== null && $_boldPath !== false ? $_boldPath : '/');
-    parse_str(strval(parse_url($_boldRequestUri, PHP_URL_QUERY) ?: ''), $_boldQueryArgs);
-    if (!empty($_boldQueryArgs['page'])) {
-        $_boldCurrentUrl .= '?page=' . intval($_boldQueryArgs['page']);
-    }
-}
+$_boldCurrentUrl = bold_canonical_url($this);
 $_boldCurrentUrlAttr = htmlspecialchars($_boldCurrentUrl, ENT_QUOTES, 'UTF-8');
 
 // 描述与标题统一转义后进入属性上下文（double_encode=false 避免二次转义）
@@ -34,7 +19,7 @@ $_boldFullTitleAttr = htmlspecialchars($_boldFullTitle, ENT_QUOTES, 'UTF-8', fal
 $_boldOgImage = get_og_image($this);
 ?>
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="<?php echo $this->options->languageSetting === 'cn' ? 'zh-CN' : 'en'; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -130,7 +115,7 @@ $_boldOgImage = get_og_image($this);
         JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
     ); ?></script>
 
-    <script>document.documentElement.classList.add('bold-loading');</script>
+    <script>document.documentElement.classList.add('bold-loading', 'has-js');</script>
     <style>
         /* 防闪烁 (Anti-FOUC)：门控与解除规则必须在任何同步外链脚本前注册，
            外部 CSS/JS 加载失败时也不会把页面永远锁在隐藏状态 */
@@ -215,7 +200,9 @@ $_boldOgImage = get_og_image($this);
 </head>
 <body class="flex flex-col min-h-screen border-t-4 border-x-0 md:border-x-4 border-black max-w-7xl mx-auto bg-white shadow-none md:shadow-[8px_8px_0px_0px_#db2777] my-0 md:my-8 transition-all">
 
-<header class="border-b-4 border-black p-6 md:p-10 bg-white sticky top-0 z-50 transition-colors duration-300">
+<a href="#main-content" class="skip-link"><?php echo get_theme_text('skip_content', $this); ?></a>
+
+<header class="site-header border-b-4 border-black p-6 md:p-10 bg-white sticky top-0 z-50 transition-colors duration-300">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div class="flex justify-between w-full md:w-auto items-center">
 
@@ -231,18 +218,24 @@ $_boldOgImage = get_og_image($this);
                     <?php $this->options->description() ?>
                 </p>
             </a>
+
+            <button type="button" id="nav-toggle" class="nav-toggle md:hidden" aria-expanded="false" aria-controls="primary-navigation">
+                <span class="sr-only"><?php echo get_theme_text('menu', $this); ?></span>
+                <svg class="nav-toggle-open" width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                <svg class="nav-toggle-close" width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M6 18 18 6M6 6l12 12"></path></svg>
+            </button>
         </div>
 
-        <nav class="w-full md:w-auto overflow-x-auto pb-1 md:pb-0" aria-label="主导航">
-            <ul class="flex md:flex-wrap gap-6 text-lg font-bold items-center whitespace-nowrap">
-                <li><a href="<?php $this->options->siteUrl(); ?>" class="hover-underline-animation <?php if($this->is('index')): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"><?php echo get_theme_text('home', $this); ?></a></li>
+        <nav id="primary-navigation" class="primary-navigation w-full md:w-auto pb-1 md:pb-0" aria-label="<?php echo get_theme_text('main_navigation', $this); ?>">
+            <ul class="flex md:flex-wrap gap-6 text-lg font-bold items-center">
+                <li><a href="<?php $this->options->siteUrl(); ?>" class="hover-underline-animation <?php if($this->is('index')): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"<?php if($this->is('index')): ?> aria-current="page"<?php endif; ?>><?php echo get_theme_text('home', $this); ?></a></li>
                 <?php $this->widget('Widget_Contents_Page_List')->to($pages); ?>
                 <?php while($pages->next()): ?>
-                <li><a href="<?php $pages->permalink(); ?>" class="hover-underline-animation <?php if($this->is('page', $pages->slug)): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"><?php $pages->title(); ?></a></li>
+                <li><a href="<?php $pages->permalink(); ?>" class="hover-underline-animation <?php if($this->is('page', $pages->slug)): ?>text-pink-600 dark:text-[#10b981]<?php endif; ?>"<?php if($this->is('page', $pages->slug)): ?> aria-current="page"<?php endif; ?>><?php $pages->title(); ?></a></li>
                 <?php endwhile; ?>
             </ul>
         </nav>
     </div>
 </header>
 
-<main class="flex-grow flex flex-col md:flex-row">
+<main id="main-content" class="flex-grow flex flex-col md:flex-row" tabindex="-1">

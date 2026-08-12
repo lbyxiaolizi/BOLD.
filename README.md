@@ -42,7 +42,9 @@
 - **Reading Time** - 自动计算阅读时间
 - **Post Views** - 文章浏览量统计
 - **Related Posts** - 基于标签的相关文章推荐
-- **Table of Contents** - 文章目录自动生成
+- **Responsive Table of Contents** - 桌面端粘性目录、移动端正文前可折叠目录
+- **Continuous Reading** - 文章底部提供自动排除受保护内容的上一篇/下一篇
+- **Copy Link** - 一键复制文章链接并提供可访问的状态反馈
 - **Colored Categories** - 彩色分类标签，每个分类有独特颜色
 - **SEO Optimization** - SEO 友好的描述和 Open Graph 标签
 
@@ -52,7 +54,8 @@
 - **Localized Text** - 所有界面文本都支持本地化
 
 ### 🎁 Additional Features / 额外功能
-- **Donation/Reward** - 打赏功能，支持微信和支付宝二维码
+- **Accessible Navigation** - 移动端折叠菜单、跳过链接、当前页标识与键盘焦点样式
+- **Donation/Reward** - 打赏功能支持微信和支付宝二维码，并具备焦点锁定、Esc 关闭与焦点归还
 - **Social Links** - 社交链接（GitHub, Bilibili, Email）
 - **Custom Code Injection** - 自定义头部/底部 HTML 代码
 - **ICP Filing** - ICP 备案号显示
@@ -84,7 +87,8 @@
 ### Upgrade Notes / 升级说明
 
 - 升级时必须完整上传新增的 `inc/`、`assets/` 目录以及根目录模板文件，不能只覆盖 `functions.php`。
-- 新版解锁 Cookie 使用站点密钥签名、带 7 天期限的 `v2` HMAC 票据。所有旧格式 Cookie 会立即失效，访客需要重新输入一次密码。
+- 新版解锁 Cookie 使用站点密钥签名、带 7 天期限的 `v2` HMAC 票据，并按单篇文章、分类和全站密码分别隔离。所有旧格式 Cookie 会立即失效，访客需要重新输入一次密码。
+- 密码表单新增匿名双提交 CSRF 保护；部署时不要移除主题签发的 `bold_password_csrf` Cookie。
 - 匿名评论后可见现在要求服务器签名的评论回执；升级前已评论的匿名访客需要重新提交一次评论，登录用户不受影响。
 - 后台重新保存一次主题设置后可看到 Google Fonts 与 Feed 保护开关；未保存时仍使用安全默认值。
 - 升级前如使用了整页缓存或 CDN，请在部署后清理旧缓存，避免继续返回升级前生成的页面或订阅源。
@@ -234,12 +238,13 @@ secret:secret456
 
 ## 🔐 Security Features / 安全特性
 
-- **HMAC Unlock Tokens** - 解锁凭据为使用 Typecho 站点密钥签名、带 7 天期限的 HMAC 票据，不再保存可永久重放的裸密码哈希
+- **Scoped HMAC Unlock Tokens** - 解锁凭据使用 Typecho 站点密钥签名并按文章、分类、全站作用域隔离，互不覆盖
 - **Hardened Cookies** - 解锁 Cookie 使用 `HttpOnly`、`SameSite=Lax`，HTTPS 请求同时启用 `Secure`
+- **Password Form CSRF Protection** - 页面与内联密码表单使用绑定页面上下文的匿名双提交令牌，直接跨站 POST 会被拒绝
 - **RSS Feed Protection** - 文章、分类和评论订阅源中的受保护内容自动脱敏，内联密码及 `{hide}` 内容不会进入 Feed
 - **Timing-Attack Resistant** - 密码比较使用 `hash_equals`，失败附加随机延迟
 - **Cookie Sanitization** - Cookie 名称清理防止注入，中文分类 slug 自动哈希隔离
-- **Cache Safety** - 受保护页面自动发送 `Cache-Control: private` / `Vary: Cookie`，兼容整页缓存/CDN
+- **Cache Safety** - 受保护页面和可能随解锁状态变化的列表在输出前发送 `Cache-Control: private` / `Vary: Cookie`
 - **Least-Privilege Bypass** - 仅编辑及以上登录用户可免密查看，订阅者不再绕过
 - **Signed Reply Proof** - 匿名评论后可见同时校验服务器签名回执与具体已审核评论，记忆邮箱不能单独充当授权
 - **Fail-Closed Markers** - 保护标记嵌套或闭合错误时从开启处停止公开输出，避免作者笔误导致正文外泄

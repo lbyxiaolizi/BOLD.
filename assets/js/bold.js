@@ -107,6 +107,41 @@
 
     document.addEventListener('DOMContentLoaded', function () {
 
+        /* ---------- 移动端主导航 ---------- */
+        var navToggle = document.getElementById('nav-toggle');
+        var primaryNavigation = document.getElementById('primary-navigation');
+
+        function setNavigationState(open) {
+            if (!navToggle || !primaryNavigation) return;
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            primaryNavigation.classList.toggle('is-open', open);
+        }
+
+        if (navToggle && primaryNavigation) {
+            navToggle.addEventListener('click', function () {
+                setNavigationState(navToggle.getAttribute('aria-expanded') !== 'true');
+            });
+
+            primaryNavigation.addEventListener('click', function (event) {
+                if (event.target.closest('a')) setNavigationState(false);
+            });
+
+            document.addEventListener('click', function (event) {
+                if (navToggle.getAttribute('aria-expanded') === 'true'
+                    && !navToggle.contains(event.target)
+                    && !primaryNavigation.contains(event.target)) {
+                    setNavigationState(false);
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && navToggle.getAttribute('aria-expanded') === 'true') {
+                    setNavigationState(false);
+                    navToggle.focus();
+                }
+            });
+        }
+
         /* ---------- 主题切换图标 ---------- */
         function updateIcons() {
             var iconSun = document.getElementById('icon-sun');
@@ -301,7 +336,167 @@
                     clampTocScroll(tocContainer);
                     // 滚轮劫持已移除：滚动链由 CSS overscroll-behavior: contain 控制
                 }
+
+                if (tocWrapper) {
+                    var tocSlot = document.getElementById('mobile-toc-slot');
+                    var tocPanelToggle = document.getElementById('toc-panel-toggle');
+                    var tocOrigin = document.createComment('toc-origin');
+                    tocWrapper.parentNode.insertBefore(tocOrigin, tocWrapper);
+                    var tocMobile = false;
+
+                    function setTocPanelState(expanded) {
+                        tocWrapper.classList.toggle('toc-panel-collapsed', !expanded);
+                        if (tocPanelToggle) {
+                            tocPanelToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                        }
+                    }
+
+                    function placeToc() {
+                        var shouldUseMobileSlot = isMobileViewport() && tocSlot;
+                        if (shouldUseMobileSlot && tocWrapper.parentNode !== tocSlot) {
+                            tocSlot.appendChild(tocWrapper);
+                            tocMobile = true;
+                            setTocPanelState(false);
+                        } else if (!shouldUseMobileSlot && tocOrigin.parentNode
+                            && tocWrapper.parentNode !== tocOrigin.parentNode) {
+                            tocOrigin.parentNode.insertBefore(tocWrapper, tocOrigin.nextSibling);
+                            tocMobile = false;
+                            setTocPanelState(true);
+                        } else if (!shouldUseMobileSlot) {
+                            tocMobile = false;
+                            setTocPanelState(true);
+                        }
+                        clampTocScroll(tocWrapper.querySelector('.toc-container'));
+                    }
+
+                    if (tocPanelToggle) {
+                        tocPanelToggle.addEventListener('click', function () {
+                            if (!tocMobile) return;
+                            setTocPanelState(tocPanelToggle.getAttribute('aria-expanded') !== 'true');
+                        });
+                    }
+
+                    placeToc();
+                    var tocResizeTimer = null;
+                    window.addEventListener('resize', function () {
+                        clearTimeout(tocResizeTimer);
+                        tocResizeTimer = setTimeout(placeToc, 120);
+                    });
+                }
             }
+        }
+
+        /* ---------- 文章链接复制 ---------- */
+        var copyLinkButton = document.getElementById('copy-article-link');
+        var copyLinkStatus = document.getElementById('copy-link-status');
+        if (copyLinkButton) {
+            var copyButtonLabel = copyLinkButton.textContent.trim();
+            var copyResetTimer = null;
+
+            function copyWithFallback(value) {
+                var input = document.createElement('textarea');
+                input.value = value;
+                input.setAttribute('readonly', '');
+                input.style.position = 'fixed';
+                input.style.opacity = '0';
+                document.body.appendChild(input);
+                input.select();
+                var succeeded = false;
+                try { succeeded = document.execCommand('copy'); } catch (error) {}
+                document.body.removeChild(input);
+                copyLinkButton.focus();
+                return succeeded ? Promise.resolve() : Promise.reject(new Error('Copy failed'));
+            }
+
+            copyLinkButton.addEventListener('click', function () {
+                var value = copyLinkButton.getAttribute('data-copy-url') || window.location.href;
+                var operation = navigator.clipboard && window.isSecureContext
+                    ? navigator.clipboard.writeText(value)
+                    : copyWithFallback(value);
+
+                operation.then(function () {
+                    var message = copyLinkButton.getAttribute('data-copy-success') || 'Link copied';
+                    copyLinkButton.textContent = message;
+                    copyLinkButton.classList.add('is-copied');
+                    if (copyLinkStatus) copyLinkStatus.textContent = message;
+                    clearTimeout(copyResetTimer);
+                    copyResetTimer = setTimeout(function () {
+                        copyLinkButton.textContent = copyButtonLabel;
+                        copyLinkButton.classList.remove('is-copied');
+                    }, 2200);
+                }).catch(function () {
+                    var message = copyLinkButton.getAttribute('data-copy-failure') || 'Copy failed';
+                    copyLinkButton.textContent = message;
+                    if (copyLinkStatus) copyLinkStatus.textContent = message;
+                    clearTimeout(copyResetTimer);
+                    copyResetTimer = setTimeout(function () {
+                        copyLinkButton.textContent = copyButtonLabel;
+                    }, 2200);
+                });
+            });
+        }
+
+        /* ---------- 打赏弹窗 ---------- */
+        var rewardOpen = document.getElementById('reward-open');
+        var rewardModal = document.getElementById('reward-modal');
+        var rewardClose = document.getElementById('reward-close');
+        var rewardReturnFocus = null;
+
+        function rewardFocusableElements() {
+            if (!rewardModal) return [];
+            return Array.prototype.slice.call(rewardModal.querySelectorAll(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            ));
+        }
+
+        function openRewardModal() {
+            if (!rewardModal) return;
+            rewardReturnFocus = document.activeElement;
+            rewardModal.classList.remove('hidden');
+            rewardModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+            var focusable = rewardFocusableElements();
+            if (focusable.length) focusable[0].focus();
+        }
+
+        function closeRewardModal() {
+            if (!rewardModal || rewardModal.classList.contains('hidden')) return;
+            rewardModal.classList.add('hidden');
+            rewardModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            if (rewardReturnFocus && typeof rewardReturnFocus.focus === 'function') {
+                rewardReturnFocus.focus();
+            }
+        }
+
+        if (rewardOpen && rewardModal) {
+            rewardOpen.addEventListener('click', openRewardModal);
+            if (rewardClose) rewardClose.addEventListener('click', closeRewardModal);
+            rewardModal.addEventListener('click', function (event) {
+                if (event.target === rewardModal) closeRewardModal();
+            });
+            rewardModal.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeRewardModal();
+                    return;
+                }
+                if (event.key !== 'Tab') return;
+                var focusable = rewardFocusableElements();
+                if (!focusable.length) {
+                    event.preventDefault();
+                    return;
+                }
+                var first = focusable[0];
+                var last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            });
         }
 
         /* ---------- 图片灯箱 & Mermaid ---------- */

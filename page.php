@@ -19,6 +19,10 @@ $showProfileCard = empty($pageFields->hideProfile);
             <h1 class="text-4xl md:text-6xl font-black uppercase relative z-10"><?php $this->title() ?></h1>
         </header>
 
+        <?php if (!$needsPassword): ?>
+        <div id="mobile-toc-slot" class="mobile-toc-slot"></div>
+        <?php endif; ?>
+
         <div class="p-6 md:p-10 prose prose-lg prose-slate max-w-none prose-headings:font-black prose-p:text-gray-800 prose-img:rounded-none">
 
             <?php if (!$needsPassword && $showProfileCard): ?>

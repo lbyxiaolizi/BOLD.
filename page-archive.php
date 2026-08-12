@@ -6,6 +6,9 @@
  */
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 
+// 时间轴条目可随分类解锁 Cookie 改变，必须在 header.php 输出前设置。
+if (bold_listings_may_vary_by_unlock_cookie()) bold_private_cache_headers();
+
 $passwordError = handlePasswordVerification($this);
 $needsPassword = isPasswordProtected($this) && !isPasswordVerified($this);
 ?>
