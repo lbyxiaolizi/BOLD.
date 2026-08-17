@@ -28,7 +28,9 @@ function bold_is_feed($widget = null) {
         // 仅保留 Router 作为兼容旧版 Typecho 的最后兜底。
     }
 
-    return class_exists('Typecho_Router') && Typecho_Router::$current === 'feed';
+    return class_exists('Typecho_Router')
+        && isset(Typecho_Router::$current)
+        && Typecho_Router::$current === 'feed';
 }
 
 /**
