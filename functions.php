@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 具体实现按职责拆分在 inc/ 目录。
  */
 
-define('BOLD_VERSION', '1.4.0');
+define('BOLD_VERSION', '1.4.1');
 define('BOLD_UNLOCK_TTL', 604800);   // 解锁 Cookie 有效期（秒）= 7 天
 define('BOLD_READING_SPEED', 300);   // 阅读速度（字/分钟）
 define('BOLD_EXCERPT_LENGTH', 140);  // 默认摘要长度

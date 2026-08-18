@@ -31,7 +31,7 @@
             <textarea name="text" rows="3" placeholder="Your Message..." aria-label="Comment" class="w-full p-2 font-bold border-2 md:border-4 border-black focus:outline-none focus:bg-yellow-50 focus:border-pink-500 transition-colors mb-3 md:mb-4 placeholder-gray-400 text-sm md:text-base" required><?php $this->remember('text'); ?></textarea>
 
             <?php if (bold_turnstile_enabled()): ?>
-            <div class="mb-4 cf-turnstile" data-sitekey="<?php $this->options->turnstileSiteKey(); ?>" data-theme="auto"></div>
+            <div id="bold-turnstile" class="mb-4 cf-turnstile" data-sitekey="<?php echo htmlspecialchars(strval($this->options->turnstileSiteKey), ENT_QUOTES, 'UTF-8'); ?>" data-theme="auto"></div>
             <?php endif; ?>
 
             <button type="submit" class="w-full md:w-auto bg-black text-white px-4 py-2 md:px-8 md:py-3 font-black text-sm md:text-lg uppercase tracking-widest hover:bg-pink-500 transition-colors border-2 border-transparent hover:border-black shadow-none hover:shadow-[3px_3px_0px_0px_#000] md:hover:shadow-[4px_4px_0px_0px_#000]">

@@ -189,8 +189,8 @@ $_boldOgImage = get_og_image($this);
     <link rel="stylesheet" href="<?php $this->options->themeUrl('assets/css/bold.css'); ?>?v=<?php echo BOLD_VERSION; ?>">
 
     <?php if (bold_turnstile_enabled() && $_boldIsArticle): ?>
-    <!-- Cloudflare Turnstile：仅在有评论表单的页面且已完整配置时加载 -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <!-- 显式渲染可在 Typecho 移动回复表单后可靠地重建验证组件 -->
+    <script id="bold-turnstile-api" src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
     <?php endif; ?>
 
     <!-- 自定义头部代码 (如验证Meta、自定义CSS) -->

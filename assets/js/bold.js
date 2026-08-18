@@ -598,6 +598,72 @@
             var textarea = commentForm.querySelector('textarea[name="text"]');
             var submitBtn = commentForm.querySelector('button[type="submit"]');
             var draftKey = 'bold_comment_draft:' + location.pathname;
+            var turnstileContainer = document.getElementById('bold-turnstile');
+            var turnstileApi = document.getElementById('bold-turnstile-api');
+            var turnstileWidgetId = null;
+            var turnstileRenderFrame = null;
+
+            function renderTurnstile() {
+                if (!turnstileContainer || turnstileWidgetId !== null
+                    || !window.turnstile || typeof window.turnstile.render !== 'function') {
+                    return;
+                }
+
+                try {
+                    turnstileWidgetId = window.turnstile.render(turnstileContainer, {
+                        sitekey: turnstileContainer.getAttribute('data-sitekey'),
+                        theme: turnstileContainer.getAttribute('data-theme') || 'auto'
+                    });
+                } catch (err) {
+                    turnstileWidgetId = null;
+                }
+            }
+
+            function resetTurnstile(recreate) {
+                if (!turnstileContainer || !window.turnstile) return;
+
+                if (recreate && turnstileWidgetId !== null
+                    && typeof window.turnstile.remove === 'function') {
+                    try { window.turnstile.remove(turnstileWidgetId); } catch (err) {}
+                    turnstileWidgetId = null;
+                } else if (!recreate && turnstileWidgetId !== null
+                    && typeof window.turnstile.reset === 'function') {
+                    try { window.turnstile.reset(turnstileWidgetId); } catch (err) {}
+                    return;
+                }
+
+                renderTurnstile();
+            }
+
+            function scheduleTurnstileRecreate() {
+                if (!turnstileContainer) return;
+                if (turnstileRenderFrame !== null) {
+                    window.cancelAnimationFrame(turnstileRenderFrame);
+                }
+                turnstileRenderFrame = window.requestAnimationFrame(function () {
+                    turnstileRenderFrame = null;
+                    resetTurnstile(true);
+                });
+            }
+
+            // Turnstile 与主题脚本均为异步资源，无论谁先到达都只渲染一次。
+            if (turnstileApi) turnstileApi.addEventListener('load', renderTurnstile);
+            renderTurnstile();
+
+            // Typecho 回复/取消回复会把整个 respond 节点移动到评论下方。
+            // 重建 iframe，避免已渲染的挑战在 DOM 重挂载后变为空白或失效。
+            var respond = commentForm.parentElement;
+            var respondParent = respond ? respond.parentNode : null;
+            var commentsRoot = document.getElementById('comments');
+            if (respond && commentsRoot && typeof MutationObserver !== 'undefined') {
+                var respondObserver = new MutationObserver(function () {
+                    if (respond.parentNode !== respondParent) {
+                        respondParent = respond.parentNode;
+                        scheduleTurnstileRecreate();
+                    }
+                });
+                respondObserver.observe(commentsRoot, { childList: true, subtree: true });
+            }
 
             // 恢复未提交成功的草稿（24 小时内），提交失败跳错误页后正文不再丢失
             try {
@@ -642,14 +708,15 @@
                 // 长时间未跳转（网络异常）时恢复可提交，并重置人机验证令牌
                 setTimeout(function () {
                     unlockCommentForm();
-                    if (window.turnstile && typeof window.turnstile.reset === 'function') {
-                        try { window.turnstile.reset(); } catch (err) {}
-                    }
+                    resetTurnstile(false);
                 }, 8000);
             });
 
-            // bfcache 返回时恢复按钮状态
-            window.addEventListener('pageshow', unlockCommentForm);
+            // bfcache 返回时旧令牌可能已经过期，同时恢复按钮与验证状态。
+            window.addEventListener('pageshow', function (event) {
+                unlockCommentForm();
+                if (event.persisted) resetTurnstile(false);
+            });
         }
     });
 })();
