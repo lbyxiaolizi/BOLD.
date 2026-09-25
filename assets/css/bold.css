@@ -1047,33 +1047,6 @@ div.code-toolbar > .toolbar button:hover {
 }
 .dark-mode .link-desc { color: #a3a3a3; }
 
-/* ====== 列表分页：页码跳转 ====== */
-.bold-page-jump input {
-    color: inherit;
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-.bold-page-jump input:focus {
-    background-color: #fff;
-    color: #000;
-    border-bottom-style: solid;
-}
-/* 覆盖全局暗色输入框样式：分页栏底色已是强调色，输入框保持透明 */
-.dark-mode .bold-page-jump input {
-    background-color: transparent !important;
-    color: inherit !important;
-    border-color: currentColor !important;
-}
-.dark-mode .bold-page-jump input:focus {
-    background-color: #000 !important;
-    color: #10b981 !important;
-}
-.bold-page-jump input::-webkit-outer-spin-button,
-.bold-page-jump input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
 /* ====== 时间轴归档 ====== */
 .dark-mode .time-tag {
     background-color: #000000 !important;
