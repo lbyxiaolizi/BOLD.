@@ -54,6 +54,22 @@ class Typecho_Widget {
     }
 }
 
+class Typecho_Router {
+    public static $routes = array(
+        'index_page' => array('format' => '/page/%s/', 'params' => array('page')),
+        'search_page' => array('format' => '/search/%s/%s/', 'params' => array('keywords', 'page')),
+    );
+    public static function get($name) { return self::$routes[$name] ?? null; }
+    public static function url($name, $value = null, $prefix = null) {
+        $route = self::$routes[$name];
+        $pattern = array();
+        foreach ($route['params'] as $row) {
+            $pattern[$row] = $value[$row] ?? '{' . $row . '}';
+        }
+        return rtrim($prefix ?? '', '/') . vsprintf($route['format'], $pattern);
+    }
+}
+
 function get_theme_text($key, $archive = null) { return '[' . $key . ']'; }
 function bold_cid_is_protected($cid) {
     return in_array(intval($cid), $GLOBALS['bold_test_protected_cids'] ?? array(), true);
@@ -73,6 +89,7 @@ Helper::$options = (object) array(
     'timezone' => 0,
     'time' => 2000,
     'siteUrl' => 'https://example.test/blog/',
+    'index' => 'https://example.test/blog',
 );
 
 Typecho_Request::getInstance()->requestUri = '/blog/category/dev/?page=2&utm_source=ignored';
@@ -187,5 +204,50 @@ bold_test_same(
 );
 bold_test_same(null, bold_get_adjacent_public_post($adjacentArchive, 'sideways'),
     'Unknown adjacent navigation directions must fail closed.');
+
+function bold_test_page_archive($type, $pageRow, $total, $currentPage) {
+    return new class($type, $pageRow, $total, $currentPage) {
+        public $parameter;
+        public $_currentPage;
+        private $pageRow;
+        private $total;
+        public function __construct($type, $pageRow, $total, $currentPage) {
+            $this->parameter = (object) array('type' => $type, 'pageSize' => 5);
+            $this->pageRow = $pageRow;
+            $this->total = $total;
+            $this->_currentPage = $currentPage;
+        }
+        public function getPageRow() { return $this->pageRow; }
+        public function getTotal() { return $this->total; }
+        public function pageLink($word, $page) { echo '<a class="' . $page . '">' . $word . '</a>'; }
+    };
+}
+
+bold_test_same('https://example.test/blog/page/{page}/',
+    bold_page_url_template(bold_test_page_archive('index', array(), 20, 1)),
+    'Index pagination template must keep the {page} placeholder.');
+bold_test_same('https://example.test/blog/search/a%20b/{page}/',
+    bold_page_url_template(bold_test_page_archive('search_page', array('keywords' => 'a%20b', 'page' => 3), 20, 3)),
+    'Paged archives must reuse the page row but drop the concrete page number.');
+bold_test_same('', bold_page_url_template(bold_test_page_archive('unknown', array(), 20, 1)),
+    'Unknown routes must fall back to plain page text.');
+
+ob_start();
+bold_render_pagination(bold_test_page_archive('index', array(), 20, 2));
+$paginationHtml = ob_get_clean();
+bold_test_same(true, strpos($paginationHtml, 'data-page-template="https://example.test/blog/page/{page}/"') !== false
+    && strpos($paginationHtml, 'data-total-pages="4"') !== false
+    && strpos($paginationHtml, 'value="2"') !== false,
+    'Multi-page listings must render the page jump form.');
+
+ob_start();
+bold_render_pagination(bold_test_page_archive('index', array(), 3, 1));
+$singlePageHtml = ob_get_clean();
+bold_test_same(false, strpos($singlePageHtml, '<form'), 'Single-page listings must not render a page jump form.');
+bold_test_same(true, strpos($singlePageHtml, '[page] 1 / 1') !== false, 'Single-page listings keep the static page label.');
+
+ob_start();
+bold_render_pagination(bold_test_page_archive('index', array(), 0, 1));
+bold_test_same('', ob_get_clean(), 'Empty listings must not render pagination.');
 
 fwrite(STDOUT, "helpers regression tests passed\n");

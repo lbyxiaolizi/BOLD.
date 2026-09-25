@@ -40,6 +40,8 @@ function get_theme_text($key, $archive = null) {
         'next_page'                   => array('en' => 'NEXT →', 'cn' => '下一页 →'),
         'page'                        => array('en' => 'PAGE', 'cn' => 'PAGE'),
         'page_n'                      => array('en' => 'Page %d', 'cn' => '第 %d 页'),
+        'jump_to_page'                => array('en' => 'Enter a page number and press Enter', 'cn' => '输入页码后回车跳转'),
+        'go'                          => array('en' => 'GO', 'cn' => '跳转'),
         'no_tags'                     => array('en' => 'No tags', 'cn' => '无标签'),
         'back_home'                   => array('en' => 'BACK HOME', 'cn' => '返回首页'),
         'go_back'                     => array('en' => 'GO BACK', 'cn' => '返回上一页'),

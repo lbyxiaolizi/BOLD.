@@ -26,7 +26,7 @@ $hoverColors = [
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col dark:border-[#10b981]">
 
-    <div>
+    <div class="flex-grow flex flex-col">
         <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
         <?php
@@ -39,7 +39,7 @@ $hoverColors = [
             // 随机卡片悬停颜色
             $randomHover = $hoverColors[array_rand($hoverColors)];
         ?>
-        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
+        <article class="last:flex-grow p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <span class="absolute -right-2 -bottom-4 md:-right-4 md:-bottom-10 text-[5rem] md:text-[10rem] font-black text-gray-100 opacity-50 z-0 pointer-events-none group-hover:text-white/50 transition-colors leading-none dark:text-[#1e1e1e] dark:group-hover:text-[#10b981]/20" aria-hidden="true">
                 <?php $this->sequence(); ?>
             </span>
@@ -71,13 +71,7 @@ $hoverColors = [
         <?php endif; ?>
     </div>
 
-    <?php if ($this->getTotal() > 0): ?>
-    <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">
-        <?php $this->pageLink(get_theme_text('prev_page', $this), 'prev'); ?>
-        <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black"><?php echo get_theme_text('page', $this); ?> <?php echo max(1, intval($this->_currentPage)); ?> / <?php echo max(1, (int) ceil($this->getTotal() / $this->parameter->pageSize)); ?></span>
-        <?php $this->pageLink(get_theme_text('next_page', $this), 'next'); ?>
-    </div>
-    <?php endif; ?>
+    <?php bold_render_pagination($this); ?>
 </div>
 
 <?php $this->need('sidebar.php'); ?>

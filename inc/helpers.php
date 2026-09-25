@@ -666,3 +666,84 @@ function printColoredCategories($archive) {
         }
     }
 }
+
+/**
+ * 返回当前归档分页路由的 URL 模板，保留 {page} 作为页码占位符。
+ *
+ * Typecho_Widget_Archive::$options 在 1.2.x 中是 protected，模板函数
+ * 不能直接访问它；站点入口必须通过 Helper::options() 取得。
+ */
+function bold_page_url_template($archive) {
+    try {
+        $type = strval($archive->parameter->type ?? '');
+        if ($type === '' || !class_exists('Typecho_Router')) {
+            return '';
+        }
+
+        $route = strpos($type, '_page') === false ? $type . '_page' : $type;
+        if (!Typecho_Router::get($route)) {
+            return '';
+        }
+
+        $row = method_exists($archive, 'getPageRow')
+            ? (array)$archive->getPageRow() : array();
+        unset($row['page']);
+
+        $options = class_exists('Helper') ? Helper::options() : null;
+        $index = is_object($options) && isset($options->index)
+            ? strval($options->index) : '';
+        if ($index === '') {
+            return '';
+        }
+
+        $url = strval(Typecho_Router::url($route, $row, $index));
+    } catch (Throwable $e) {
+        return '';
+    }
+
+    return strpos($url, '{page}') !== false || stripos($url, '%7Bpage%7D') !== false
+        ? $url : '';
+}
+
+/**
+ * 输出列表底部分页栏：上一页 / 可输入页码 / 下一页。
+ */
+function bold_render_pagination($archive) {
+    $total = intval($archive->getTotal());
+    if ($total <= 0) {
+        return;
+    }
+
+    $pageSize = max(1, intval($archive->parameter->pageSize));
+    $totalPages = max(1, (int)ceil($total / $pageSize));
+    $currentPage = min($totalPages, max(1, intval($archive->_currentPage)));
+    $template = $totalPages > 1 ? bold_page_url_template($archive) : '';
+    $pillClass = 'text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black';
+
+    echo '<div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center gap-3 font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">';
+    $archive->pageLink(get_theme_text('prev_page', $archive), 'prev');
+
+    if ($template === '') {
+        echo '<span class="' . $pillClass . '">' . get_theme_text('page', $archive)
+            . ' ' . $currentPage . ' / ' . $totalPages . '</span>';
+    } else {
+        $label = htmlspecialchars(get_theme_text('jump_to_page', $archive), ENT_QUOTES, 'UTF-8');
+        $inputId = 'bold-page-jump-input-' . substr(md5($template), 0, 8);
+        echo '<form class="bold-page-jump inline-flex items-center gap-1 ' . $pillClass . '" novalidate'
+            . ' data-page-template="' . htmlspecialchars($template, ENT_QUOTES, 'UTF-8') . '"'
+            . ' data-current-page="' . $currentPage . '" data-total-pages="' . $totalPages . '">'
+            . '<label for="' . $inputId . '">' . get_theme_text('page', $archive) . '</label>'
+            . '<input id="' . $inputId . '" type="number" name="page" min="1" max="' . $totalPages . '"'
+            . ' value="' . $currentPage . '" inputmode="numeric" enterkeyhint="go" autocomplete="off"'
+            . ' title="' . $label . '" aria-label="' . $label . '"'
+            . ' style="width:' . (strlen(strval($totalPages)) + 1) . 'ch"'
+            . ' class="bg-transparent text-center font-bold border-b-2 border-dashed border-current rounded-none p-0">'
+            . '<span>/ ' . $totalPages . '</span>'
+            . '<button type="submit" hidden class="ml-1 px-2 bg-white text-black rounded-full hover:bg-pink-500 hover:text-white transition-colors">'
+            . get_theme_text('go', $archive) . '</button>'
+            . '</form>';
+    }
+
+    $archive->pageLink(get_theme_text('next_page', $archive), 'next');
+    echo '</div>';
+}
