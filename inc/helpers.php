@@ -684,7 +684,8 @@ function bold_page_url_template($archive) {
         }
         $row = method_exists($archive, 'getPageRow') ? (array) $archive->getPageRow() : array();
         unset($row['page']);
-        $url = strval(Typecho_Router::url($route, $row, $archive->options->index));
+        // 小部件的 options 为 protected，模板外访问恒为 null，须经 Helper 读取
+        $url = strval(Typecho_Router::url($route, $row, Helper::options()->index));
     } catch (Throwable $e) {
         return '';
     }

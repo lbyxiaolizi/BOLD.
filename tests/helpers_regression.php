@@ -204,16 +204,15 @@ bold_test_same(
 bold_test_same(null, bold_get_adjacent_public_post($adjacentArchive, 'sideways'),
     'Unknown adjacent navigation directions must fail closed.');
 
+Helper::$options->index = 'https://example.test/blog';
 function bold_test_page_archive($type, $pageRow, $total, $currentPage) {
     return new class($type, $pageRow, $total, $currentPage) {
         public $parameter;
-        public $options;
         public $_currentPage;
         private $pageRow;
         private $total;
         public function __construct($type, $pageRow, $total, $currentPage) {
             $this->parameter = (object) array('type' => $type, 'pageSize' => 5);
-            $this->options = (object) array('index' => 'https://example.test/blog');
             $this->pageRow = $pageRow;
             $this->total = $total;
             $this->_currentPage = $currentPage;
