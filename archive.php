@@ -51,11 +51,11 @@ $hoverColors = [
         <?php renderPasswordForm($this, $passwordError); ?>
     </div>
     <?php else: ?>
-    <div class="flex-grow flex flex-col">
+    <div class="flex-grow">
         <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
         <?php $randomHover = $hoverColors[array_rand($hoverColors)]; ?>
-        <article class="last:flex-grow p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
+        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <div class="relative z-10">
                 <div class="flex items-center gap-2 mb-3 md:mb-4 text-xs font-bold uppercase tracking-wider flex-wrap">
                     <time class="bg-white px-2 py-1 border-2 border-black dark:bg-[#121212] dark:text-[#e5e5e5] dark:border-[#10b981]" datetime="<?php echo bold_iso8601($this->created); ?>"><?php $this->date(); ?></time>

@@ -26,7 +26,7 @@ $hoverColors = [
 
 <div class="w-full md:w-2/3 border-b-4 md:border-b-0 md:border-r-4 border-black flex flex-col dark:border-[#10b981]">
 
-    <div class="flex-grow flex flex-col">
+    <div class="flex-grow">
         <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
         <?php
@@ -39,7 +39,7 @@ $hoverColors = [
             // 随机卡片悬停颜色
             $randomHover = $hoverColors[array_rand($hoverColors)];
         ?>
-        <article class="last:flex-grow p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
+        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <span class="absolute -right-2 -bottom-4 md:-right-4 md:-bottom-10 text-[5rem] md:text-[10rem] font-black text-gray-100 opacity-50 z-0 pointer-events-none group-hover:text-white/50 transition-colors leading-none dark:text-[#1e1e1e] dark:group-hover:text-[#10b981]/20" aria-hidden="true">
                 <?php $this->sequence(); ?>
             </span>

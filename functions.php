@@ -188,6 +188,17 @@ function themeInit($archive) {
     $isListing = $archive->is('index') || $archive->is('archive')
         || $archive->is('category') || $archive->is('tag')
         || $archive->is('search') || $archive->is('author') || $archive->is('date');
+
+    // 列表页若只取固定数量文章，侧栏较高时最后一格会留下大片空白。
+    // 多取一篇自然文章填充，不再把最后一篇文章强行拉伸到整列高度。
+    $parameters = $archive->parameter;
+    if (!bold_is_feed($archive) && $isListing && is_object($parameters)) {
+        $pageSize = intval($parameters->pageSize ?? 0);
+        if ($pageSize > 0) {
+            $parameters->pageSize = $pageSize + 1;
+        }
+    }
+
     if (!bold_is_feed($archive) && $isListing && bold_listings_may_vary_by_unlock_cookie()) {
         bold_private_cache_headers();
     }
