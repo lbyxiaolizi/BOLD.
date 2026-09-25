@@ -51,11 +51,11 @@ $hoverColors = [
         <?php renderPasswordForm($this, $passwordError); ?>
     </div>
     <?php else: ?>
-    <div class="flex-grow">
+    <div class="flex-grow flex flex-col">
         <?php if ($this->have()): ?>
         <?php while($this->next()): ?>
         <?php $randomHover = $hoverColors[array_rand($hoverColors)]; ?>
-        <article class="p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
+        <article class="last:flex-grow p-6 md:p-10 border-b-4 border-black transition-colors group relative overflow-hidden <?php echo $randomHover; ?> dark:border-[#10b981] dark:hover:bg-[#2d2d2d]">
             <div class="relative z-10">
                 <div class="flex items-center gap-2 mb-3 md:mb-4 text-xs font-bold uppercase tracking-wider flex-wrap">
                     <time class="bg-white px-2 py-1 border-2 border-black dark:bg-[#121212] dark:text-[#e5e5e5] dark:border-[#10b981]" datetime="<?php echo bold_iso8601($this->created); ?>"><?php $this->date(); ?></time>
@@ -77,13 +77,7 @@ $hoverColors = [
         <?php endif; ?>
     </div>
 
-    <?php if ($this->getTotal() > 0): ?>
-    <div class="mt-auto p-6 md:p-10 border-t-4 border-black bg-black text-white flex justify-between items-center font-bold dark:bg-[#10b981] dark:text-black dark:border-[#10b981]">
-        <?php $this->pageLink(get_theme_text('prev_page', $this), 'prev'); ?>
-        <span class="text-xs md:text-sm tracking-widest border border-white px-2 md:px-3 py-1 rounded-full dark:border-black"><?php echo get_theme_text('page', $this); ?> <?php echo max(1, intval($this->_currentPage)); ?> / <?php echo max(1, (int) ceil($this->getTotal() / $this->parameter->pageSize)); ?></span>
-        <?php $this->pageLink(get_theme_text('next_page', $this), 'next'); ?>
-    </div>
-    <?php endif; ?>
+    <?php bold_render_pagination($this); ?>
     <?php endif; ?>
 </div>
 

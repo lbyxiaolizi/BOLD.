@@ -142,6 +142,54 @@
             });
         }
 
+        /* ---------- 列表分页：输入页码跳转 ---------- */
+        var pageJump = document.querySelector('.bold-page-jump');
+        if (pageJump) {
+            var pageInput = pageJump.querySelector('input');
+            var pageGo = pageJump.querySelector('button');
+            var pageTemplate = pageJump.getAttribute('data-page-template') || '';
+            var currentPage = parseInt(pageJump.getAttribute('data-current-page'), 10) || 1;
+            var totalPages = parseInt(pageJump.getAttribute('data-total-pages'), 10) || 1;
+
+            function syncPageGo() {
+                if (pageGo) pageGo.hidden = parseInt(pageInput.value, 10) === currentPage;
+            }
+
+            pageInput.addEventListener('input', syncPageGo);
+            pageInput.addEventListener('focus', function () { pageInput.select(); });
+            pageInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    pageInput.value = currentPage;
+                    syncPageGo();
+                    pageInput.blur();
+                }
+            });
+
+            pageJump.addEventListener('submit', function (event) {
+                event.preventDefault();
+                var target = parseInt(pageInput.value, 10);
+                if (isNaN(target)) {
+                    pageInput.value = currentPage;
+                    syncPageGo();
+                    return;
+                }
+                target = Math.min(totalPages, Math.max(1, target));
+                pageInput.value = target;
+                if (target === currentPage) {
+                    syncPageGo();
+                    return;
+                }
+                window.location.href = pageTemplate.replace(/\{page\}|%7Bpage%7D/gi, String(target));
+            });
+
+            // bfcache 返回时恢复为当前页码
+            window.addEventListener('pageshow', function (event) {
+                if (!event.persisted) return;
+                pageInput.value = currentPage;
+                syncPageGo();
+            });
+        }
+
         /* ---------- 主题切换图标 ---------- */
         function updateIcons() {
             var iconSun = document.getElementById('icon-sun');
