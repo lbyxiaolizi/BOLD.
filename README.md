@@ -90,6 +90,7 @@
 - 新版解锁 Cookie 使用站点密钥签名、带 7 天期限的 `v2` HMAC 票据，并按单篇文章、分类和全站密码分别隔离。所有旧格式 Cookie 会立即失效，访客需要重新输入一次密码。
 - 密码表单新增匿名双提交 CSRF 保护；部署时不要移除主题签发的 `bold_password_csrf` Cookie。
 - 匿名评论后可见现在要求服务器签名的评论回执；升级前已评论的匿名访客需要重新提交一次评论，登录用户不受影响。
+- 1.4.3 在 Markdown 渲染前处理内联密码和评论可见标记，脚注与引用定义遵循相同授权；已有内联密码票据可能因内容块标识变化需要重新输入密码。
 - 后台重新保存一次主题设置后可看到 Google Fonts 与 Feed 保护开关；未保存时仍使用安全默认值。
 - 升级前如使用了整页缓存或 CDN，请在部署后清理旧缓存，避免继续返回升级前生成的页面或订阅源。
 
@@ -206,6 +207,8 @@ secret:secret456
 
 创建新页面，选择模板 "时间轴归档"
 
+时间轴不展示 Typecho 原生密码文章，避免公开其真实标题；主题加密分类仍按访客的分类解锁状态显示。
+
 #### Links Page / 友情链接
 
 创建新页面，选择模板 "友情链接"，在页面内容中添加链接信息。
@@ -249,8 +252,17 @@ secret:secret456
 - **Signed Reply Proof** - 匿名评论后可见同时校验服务器签名回执与具体已审核评论，记忆邮箱不能单独充当授权
 - **Fail-Closed Markers** - 保护标记嵌套或闭合错误时从开启处停止公开输出，避免作者笔误导致正文外泄
 - **No Content Leakage** - 未解锁时列表、SEO 描述和社交图片不读取受保护正文；最新评论始终排除受保护文章下的讨论
+- **Protected Markdown** - 未授权内容在渲染前移除，隐藏块的脚注和引用定义不会流入正文、Feed 或频道描述
+- **Comment Image Safety** - 图片灯箱通过 DOM API 设置图片地址，评论图片中的引号不会变成 HTML 属性
 
 完整审计记录、验证状态和残余边界见 [security.md](./security.md)。
+
+安全回归可分别运行 `tests/` 中的 PHP 脚本。真实 Typecho 渲染与 SQLite 字段验证、浏览器灯箱验证需要额外指定本地依赖：
+
+```bash
+BOLD_TYPECHO_ROOT=/path/to/typecho php tests/typecho_integration_regression.php
+PLAYWRIGHT_MODULE=/path/to/playwright-core BROWSER_BIN=/path/to/chrome node tests/view_image_regression.js
+```
 
 ---
 

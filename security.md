@@ -1,10 +1,10 @@
 # BOLD Security Review
 
-审计日期：2026-08-13
+初次审计日期：2026-08-13；最新修复复核：2026-10-03。
 
 本文记录本轮对密码保护、订阅源、派生内容、数据库写入和前端资源加载的复核结果。除特别说明外，攻击者前提均为未登录访客。这里的“受保护”包括全站密码、分类密码、文章或页面自定义字段 `password`，以及正文中的 `{hide}` / `{password:...}` 标记。
 
-当前验证状态：修复已实现，并在 Typecho 1.2.1 + PHP 8.3 + SQLite 的完整本地站点中完成集成验证。当前工作树中的全部 PHP 文件已通过 `php -l`，`assets/js/bold.js` 与 `assets/vendor/view-image.min.js` 已通过 Node.js 语法检查，`git diff --check` 通过；JSON-LD 中的 `</script>` 会编码为 `\u003C\/script\u003E`。四个专项脚本均通过：`tests/helpers_regression.php`、`tests/password_security_regression.php`、`tests/protected_content_regression.php`、`tests/reply_unlock_regression.php`。真实验证覆盖文章与评论 Feed、四类页面密码提交、匿名评论回执、SQLite 阅读量迁移与原子自增、首页隐藏分页，以及桌面和 390x844 移动视口的可见性、暗色模式、FAB 焦点与横向溢出。尚未验证生产 CDN/整页缓存配置及 MySQL、PostgreSQL、读写分离部署。
+2026-08-13 验证状态：修复已实现，并在 Typecho 1.2.1 + PHP 8.3 + SQLite 的完整本地站点中完成集成验证。当前工作树中的全部 PHP 文件已通过 `php -l`，`assets/js/bold.js` 与 `assets/vendor/view-image.min.js` 已通过 Node.js 语法检查，`git diff --check` 通过；JSON-LD 中的 `</script>` 会编码为 `\u003C\/script\u003E`。四个专项脚本均通过：`tests/helpers_regression.php`、`tests/password_security_regression.php`、`tests/protected_content_regression.php`、`tests/reply_unlock_regression.php`。真实验证覆盖文章与评论 Feed、四类页面密码提交、匿名评论回执、SQLite 阅读量迁移与原子自增、首页隐藏分页，以及桌面和 390x844 移动视口的可见性、暗色模式、FAB 焦点与横向溢出。尚未验证生产 CDN/整页缓存配置及 MySQL、PostgreSQL、读写分离部署。
 
 ### 1. RSS/Atom 与派生内容泄露
 
@@ -138,9 +138,62 @@
 - Google Fonts、Prism、tocbot、MathJax、Mermaid 和 Turnstile 仍依赖各自 CDN。SRI 降低资源被篡改风险，但不能解决网络可用性；Google Fonts 可在主题设置中关闭。
 - `customHead` / `customFooter` 是管理员信任边界，注入其中的脚本不受主题的 SRI 或行为约束。
 
+## 2026-10-01 审计修复补充
+
+状态：已修复；新增 `tests/audit_regression.php` 覆盖本次问题。
+
+深入复核确认：
+
+- PHP `empty('0')` 为真，导致合法的字段密码、分类密码和全站密码 `0` 在不同授权入口被忽略，签名票据被拒绝，评论 Feed 和侧栏的 CID 保护判定与正文门禁不一致。
+- 分类归档开关保存为字符串 `0` 时，被错误当成未配置，选择“不需要”仍会执行密码门禁。
+- 时间轴直接查询原始标题并仅检查主题分类密码，绕过 Typecho 原生密码文章的标题隐藏逻辑。
+
+本轮修复：
+
+- 密码配置、提交验证、签名票据、CID 保护判定和列表缓存探测统一使用严格的空字符串判断；分类配置保留密码及 slug `0`。
+- 分类归档开关显式关闭时不执行归档门禁；配置缺失时仍默认要求密码。
+- 时间轴在 SQL 层排除所有原生非空密码文章，包括原生密码 `0`；空字符串和 NULL 密码文章保留。
+- 新增测试覆盖字段、全站和分类密码 `0`、真实模板开关分支、页面与内联密码 POST、票据重放验证、评论 Feed 脱敏，以及时间轴公开/受保护候选。
+- 将构建依赖 `nanoid` 从 3.3.16 更新至 3.3.19，消除本次依赖审计告警；不改变生产 PHP 依赖。
+- 全部五组回归测试、PHP/JavaScript 语法检查、CSS 构建和 `git diff --check` 通过；CSS 构建产物没有变化，`npm audit` 返回零告警。
+
+残余边界：
+
+- 本次验证使用主题代码和 Typecho 测试替身，不代表已重新执行本文上一轮的完整站点、CDN 或多数据库集成验收。
+- 原生密码文章即使当前访客已解锁，也不进入公开时间轴；仍可通过单篇链接访问。
+- 支持密码 `0` 只是修复配置一致性，不提升弱密码的抗猜测能力；生产环境仍应使用高熵密码和请求限速。
+
+## 2026-10-03 审计修复补充
+
+状态：本轮四项问题已修复。六组 PHP 回归、官方 Typecho 1.2.1 路由验证及 Chrome 灯箱回归全部通过；全部 PHP 与相关 JavaScript 语法检查、CSS 构建、`git diff --check` 通过，`npm audit` 报告零漏洞。本轮核心与 SQLite 验证使用 PHP 8.5。
+
+深入复核确认：
+
+- 灯箱把图片 `src` 拼入 `innerHTML`，在允许评论图片的站点上可将 URL 内的引号重新解释为 HTML 属性。浏览器验证确认原版会产生额外属性，修复版只保留图片自身属性。
+- Typecho Markdown 会把脚注移动到文末，并在渲染时解析全局引用定义；仅在渲染后删除保护标记会泄露块内脚注和引用 URL。
+- CID 保护判定仅读取字段 `str_value`，而核心按 `type` 读取整数和浮点数，正文和评论脱敏边界不一致。
+- canonical 只读取查询字符串页码，遗漏核心路径分页，使后续页的 canonical 与 `og:url` 指向第一页。
+
+本轮修复：
+
+- 灯箱直接追加已加载的 `Image` 元素，通过属性 API 设置图片地址，不再将 URL 放进 HTML 字符串。版本升级为 1.4.3，更新静态资源缓存标识。
+- 正文和 Feed 钩子在含保护标记时从原文重建授权后的内容，再调用内容插件及 Markdown/autoP 渲染；主题生成的密码表单和提示使用随机占位符，渲染后恢复 HTML。隐藏脚注、引用定义和畸形标记都在渲染前移除。
+- 单篇评论 Feed 的频道描述从已剥离保护块的原文重建；即使关闭整篇 Feed 脱敏，内联隐藏内容仍不会进入频道描述。
+- CID 判定按字段类型读取 str/int/float/json 值，未知类型按保密优先处理；列表缓存探测同时识别数字密码字段。
+- 分页 canonical 优先使用核心当前页、分页路由和路由参数，覆盖子目录、搜索、自定义路径/查询路由，并移除请求中的跟踪参数。
+- 新增 `tests/typecho_integration_regression.php`，使用官方 Typecho 1.2.1 的 Markdown/字段读取与临时 SQLite；覆盖匿名拒绝、作者/已审评论/正确密码接受、错误密码拒绝、Feed 正文/摘要/频道描述、引用定义、嵌套/未闭合保护块、非 Markdown 内容、数字字段和内容插件转换。
+- 新增 `tests/view_image_regression.js`，用真实浏览器检查引号 URL、打开、按钮/键盘切换、循环、关闭和重开；扩展 `tests/helpers_regression.php` 的分页 canonical 回归。
+
+残余边界：
+
+- 上述验证是核心组件、临时 SQLite 和 Chrome 的专项集成验证，没有重新执行生产 CDN、多数据库或完整站点界面验收。
+- 内容含保护标记时会重建渲染，相关内容/摘要/Markdown 插件可能被调用两次；插件应遵循 Typecho 的输入参数，不应自行从数据库重取未授权正文。管理员配置的代码和第三方插件仍属于受信任边界。
+- 内联密码块标识现在基于原文位置，旧内联 Cookie 可能失效，需要重新输入密码；文章/分类/全站票据和评论回执保持原有格式。
+- 发布后应清理已有 HTML/Feed 缓存，历史副本不会由代码修复自动撤回。
+
 ## 验证记录与部署验收
 
-本轮本地真实站点已验证：
+2026-08-13 本地真实站点已验证：
 
 1. 主 RSS2、RSS1、Atom、分类 Feed 与评论总 Feed 不含测试秘密；受保护评论项的正文和参与者元数据均已脱敏。
 2. 分类、文章自定义字段、时间轴页面和友情链接页面四类密码门禁均完成错误密码、正确密码 `302`、Cookie 属性及解锁后访问验证。

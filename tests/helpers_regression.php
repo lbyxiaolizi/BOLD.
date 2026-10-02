@@ -56,8 +56,14 @@ class Typecho_Widget {
 
 class Typecho_Router {
     public static $routes = array(
+        'index' => array('format' => '/', 'params' => array()),
         'index_page' => array('format' => '/page/%s/', 'params' => array('page')),
+        'category' => array('format' => '/category/%s/', 'params' => array('slug')),
+        'category_page' => array('format' => '/category/%s/%s/', 'params' => array('slug', 'page')),
+        'search' => array('format' => '/search/%s/', 'params' => array('keywords')),
         'search_page' => array('format' => '/search/%s/%s/', 'params' => array('keywords', 'page')),
+        'archive_year' => array('format' => '/%s/', 'params' => array('year')),
+        'archive_year_page' => array('format' => '/%s/page/%s/', 'params' => array('year', 'page')),
     );
     public static function get($name) { return self::$routes[$name] ?? null; }
     public static function url($name, $value = null, $prefix = null) {
@@ -110,6 +116,84 @@ $fallbackArchive = new class {
 };
 bold_test_same('https://example.test/blog/search/term/?page=3', bold_canonical_url($fallbackArchive),
     'Canonical fallback must use site origin so a subdirectory is not duplicated.');
+
+function bold_test_canonical_archive($type, $page, $row, $url) {
+    return new class($type, $page, $row, $url) {
+        public $options;
+        public $parameter;
+        private $page;
+        private $row;
+        private $url;
+        public function __construct($type, $page, $row, $url) {
+            $this->options = Helper::options();
+            $this->parameter = (object) array('type' => $type);
+            $this->page = $page;
+            $this->row = $row;
+            $this->url = $url;
+        }
+        public function is($type) { return false; }
+        public function getCurrentPage() { return $this->page; }
+        public function getPageRow() { return $this->row; }
+        public function getArchiveUrl() { return $this->url; }
+    };
+}
+
+Typecho_Request::getInstance()->requestUri = '/blog/page/2/?utm_source=ignored';
+bold_test_same('https://example.test/blog/page/2/',
+    bold_canonical_url(bold_test_canonical_archive('index_page', 2, array(), 'https://example.test/blog/')),
+    'Path-based index pagination must use the core current page and pagination route.');
+Typecho_Request::getInstance()->requestUri = '/blog/category/dev/2/?page=99&utm_source=ignored';
+bold_test_same('https://example.test/blog/category/dev/2/',
+    bold_canonical_url(bold_test_canonical_archive('category_page', 2, array('slug' => 'dev'), 'https://example.test/blog/category/dev/')),
+    'Core current-page state must take precedence over a conflicting query parameter.');
+Typecho_Request::getInstance()->requestUri = '/blog/?page=99';
+bold_test_same('https://example.test/blog/',
+    bold_canonical_url(bold_test_canonical_archive('index', 1, array(), 'https://example.test/blog/')),
+    'The first page must retain the core archive URL without a pagination suffix.');
+Typecho_Request::getInstance()->requestUri = '/blog/2026/page/4/?utm_source=ignored';
+bold_test_same('https://example.test/blog/2026/page/4/',
+    bold_canonical_url(bold_test_canonical_archive('archive_year_page', 4, array('year' => '2026'), 'https://example.test/blog/2026/')),
+    'Date archives must retain their route parameters when generating paginated canonical URLs.');
+Typecho_Request::getInstance()->requestUri = '/blog/search/a%20b/3/?utm_source=ignored';
+bold_test_same('https://example.test/blog/search/a%20b/3/',
+    bold_canonical_url(bold_test_canonical_archive('search_page', 3, array('keywords' => 'a%20b'), 'https://example.test/blog/search/a%20b/')),
+    'Search pagination must preserve the encoded keywords in the core page row.');
+
+$categoryPageRoute = Typecho_Router::$routes['category_page'];
+Typecho_Router::$routes['category_page'] = array('format' => '/topics/%s/%s/p/%s/',
+    'params' => array('directory', 'slug', 'page'));
+Typecho_Request::getInstance()->requestUri = '/blog/topics/lang/php/p/2/';
+bold_test_same('https://example.test/blog/topics/lang/php/p/2/',
+    bold_canonical_url(bold_test_canonical_archive('category', 2,
+        array('directory' => 'lang', 'slug' => 'php'), 'https://example.test/blog/topics/lang/php/')),
+    'Custom pagination routes must use the entire core page row.');
+Typecho_Router::$routes['category_page'] = $categoryPageRoute;
+
+$searchRoute = Typecho_Router::$routes['search'];
+$searchPageRoute = Typecho_Router::$routes['search_page'];
+Typecho_Router::$routes['search'] = array('format' => '/?s=%s', 'params' => array('keywords'));
+Typecho_Router::$routes['search_page'] = array('format' => '/?s=%s&pg=%s', 'params' => array('keywords', 'page'));
+Typecho_Request::getInstance()->requestUri = '/blog/?s=a%20b&pg=3&utm_source=ignored';
+bold_test_same('https://example.test/blog/?s=a%20b&pg=3',
+    bold_canonical_url(bold_test_canonical_archive('search_page', 3,
+        array('keywords' => 'a%20b'), 'https://example.test/blog/?s=a%20b')),
+    'Query-based routes must retain functional search and pagination parameters only.');
+Typecho_Request::getInstance()->requestUri = '/blog/?s=a%20b&utm_source=ignored';
+bold_test_same('https://example.test/blog/?s=a%20b',
+    bold_canonical_url(bold_test_canonical_archive('search', 1,
+        array('keywords' => 'a%20b'), 'https://example.test/blog/?s=a%20b&utm_source=ignored#top')),
+    'The first search page must keep route query parameters while dropping tracking and fragments.');
+Typecho_Router::$routes['search'] = $searchRoute;
+Typecho_Router::$routes['search_page'] = $searchPageRoute;
+
+Typecho_Request::getInstance()->requestUri = '/blog/plugin/page/2/?utm_source=ignored';
+bold_test_same('https://example.test/blog/plugin/page/2/',
+    bold_canonical_url(bold_test_canonical_archive('unknown', 2, array(), 'https://example.test/blog/plugin/')),
+    'Missing plugin pagination routes must fall back to the actual paginated request path.');
+Typecho_Request::getInstance()->requestUri = '/blog/plugin/?page=3&utm_source=ignored';
+bold_test_same('https://example.test/blog/plugin/?page=3',
+    bold_canonical_url(bold_test_canonical_archive('unknown', 3, array(), 'https://example.test/blog/plugin/')),
+    'Query-pagination fallback must retain only the effective page parameter.');
 
 $categories = array(
     array('mid' => 30, 'order' => 1, 'slug' => 'later-mid', 'parent' => 0),

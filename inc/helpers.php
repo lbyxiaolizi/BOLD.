@@ -34,7 +34,7 @@ function bold_mailto($value) {
 }
 
 /**
- * 生成当前页面 canonical URL。非文章页面优先采用 Typecho 的归档 URL；
+ * 生成当前页面 canonical URL。分页采用核心当前页及归档分页路由；
  * 回退时只使用站点配置中的 origin 和当前请求路径，避免子目录重复拼接。
  */
 function bold_canonical_url($archive) {
@@ -67,6 +67,43 @@ function bold_canonical_url($archive) {
         $archiveUrl = '';
     }
 
+    parse_str(strval(parse_url($requestUri, PHP_URL_QUERY) ?: ''), $queryArgs);
+    $queryPage = isset($queryArgs['page']) && is_scalar($queryArgs['page'])
+        ? intval($queryArgs['page']) : 0;
+    $currentPage = 0;
+    try {
+        if (method_exists($archive, 'getCurrentPage')) {
+            $currentPage = intval($archive->getCurrentPage());
+        }
+    } catch (Throwable $e) {
+        $currentPage = 0;
+    }
+    $page = $currentPage > 0 ? $currentPage : $queryPage;
+    $routeUrl = '';
+    if ($page > 1) {
+        $template = bold_page_url_template($archive);
+        if ($template !== '') {
+            $routeUrl = str_ireplace(array('{page}', '%7Bpage%7D'), strval($page), $template);
+            $archiveUrl = $routeUrl;
+        } elseif ($currentPage > 1) {
+            // 插件路由缺少分页模板时保留实际请求路径，避免退回第一页。
+            $archiveUrl = '';
+        }
+    } else {
+        try {
+            $type = preg_replace('/_page$/', '', strval($archive->parameter->type ?? ''));
+            $options = Helper::options();
+            if ($type !== '' && class_exists('Typecho_Router') && Typecho_Router::get($type)
+                && strval($options->index ?? '') !== '') {
+                $row = method_exists($archive, 'getPageRow') ? (array)$archive->getPageRow() : array();
+                unset($row['page']);
+                $routeUrl = strval(Typecho_Router::url($type, $row, strval($options->index)));
+            }
+        } catch (Throwable $e) {
+            $routeUrl = '';
+        }
+    }
+
     $archiveParts = $archiveUrl !== '' ? parse_url($archiveUrl) : false;
     if (is_array($archiveParts)) {
         $archiveScheme = strtolower(strval($archiveParts['scheme'] ?? ''));
@@ -96,10 +133,11 @@ function bold_canonical_url($archive) {
             : $requestPath;
     }
 
-    parse_str(strval(parse_url($requestUri, PHP_URL_QUERY) ?: ''), $queryArgs);
-    $page = isset($queryArgs['page']) && is_scalar($queryArgs['page'])
-        ? intval($queryArgs['page']) : 0;
-    if ($page > 0) {
+    // 仅保留核心路由生成的功能参数；请求中的跟踪参数不进入规范地址。
+    $routeQuery = $routeUrl !== '' ? parse_url($routeUrl, PHP_URL_QUERY) : null;
+    if (is_string($routeQuery) && $routeQuery !== '') {
+        $canonical .= '?' . $routeQuery;
+    } elseif ($routeUrl === '' && $queryPage > 0) {
         $canonical .= '?page=' . $page;
     }
 
@@ -117,7 +155,7 @@ function bold_listings_may_vary_by_unlock_cookie() {
     }
 
     $options = Helper::options();
-    if (!empty($options->postPassword) || !empty(bold_get_protected_slugs())) {
+    if (strval($options->postPassword ?? '') !== '' || !empty(bold_get_protected_slugs())) {
         return $varies = true;
     }
 
@@ -125,7 +163,7 @@ function bold_listings_may_vary_by_unlock_cookie() {
         $field = Typecho_Db::get()->fetchRow(Typecho_Db::get()->select('cid')
             ->from('table.fields')
             ->where('name = ?', 'password')
-            ->where('str_value <> ?', '')
+            ->where('(str_value <> ? OR type <> ?)', '', 'str')
             ->limit(1));
         return $varies = !empty($field);
     } catch (Throwable $e) {
@@ -534,7 +572,7 @@ function bold_category_directory_slugs($primary, $categoryByMid) {
  * 时间轴归档数据。
  * 三次轻量查询分别取文章、分类树和关联映射，不读正文，
  * 同时复制 Typecho 的主分类、父级目录与 URL 编码规则。
- * 受保护分类的文章对未解锁访客直接隐藏。
+ * 受保护分类的文章对未解锁访客直接隐藏；原生密码文章不进入公开时间轴。
  *
  * @return array [ ['permalink' => ..., 'title' => ..., 'created' => ...], ... ]
  */
@@ -547,6 +585,7 @@ function bold_timeline_posts() {
         ->where('type = ?', 'post')
         ->where('status = ?', 'publish')
         ->where('created < ?', $options->time)
+        ->where('(password IS NULL OR password = ?)', '')
         ->order('created', Typecho_Db::SORT_DESC));
 
     if (empty($rows)) {

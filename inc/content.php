@@ -192,6 +192,51 @@ function bold_protection_notice($archive) {
 }
 
 /**
+ * 保护块必须在 Markdown 提取脚注/引用定义前处理。生成的表单与提示使用
+ * 请求内随机占位符避开 Markdown，完成渲染后再恢复为主题 HTML。
+ */
+function bold_render_protected_source($widget, $excerpt = false) {
+    $source = strval($widget->text ?? '');
+    $parsed = bold_parse_protected_content($source);
+    if (!$parsed['has_markers']) {
+        return null;
+    }
+
+    $html = array();
+    $prefix = 'BOLDPROTECTED' . bin2hex(random_bytes(16));
+    $placeholder = function ($fragment) use (&$html, $prefix) {
+        $token = $prefix . 'BLOCK' . count($html) . 'END';
+        $html[$token] = $fragment;
+        return $token;
+    };
+
+    if (bold_is_feed($widget) || !bold_archive_is($widget, 'single')) {
+        $source = bold_strip_protected_markers($source,
+            $parsed['invalid'] ? $placeholder(bold_protection_notice($widget)) : '');
+    } else {
+        $source = parseInlinePasswordContent($source, $widget, $placeholder);
+        $source = parseReplyContent($source, $widget, $placeholder);
+    }
+
+    // 源内容插件同样只接收已授权的原文，保留核心的短代码/渲染扩展入口。
+    $plugged = false;
+    $rendered = $source;
+    if (class_exists('Typecho_Plugin')) {
+        $hook = $excerpt ? 'excerpt' : 'content';
+        $rendered = Typecho_Plugin::factory('Widget_Abstract_Contents')->trigger($plugged)->$hook($source, $widget);
+    }
+    if (!$plugged) {
+        $method = !empty($widget->isMarkdown) ? 'markdown' : 'autoP';
+        $rendered = $widget->$method($source);
+    }
+    if ($excerpt) {
+        $parts = explode('<!--more-->', $rendered, 2);
+        $rendered = $parts[0];
+    }
+    return strtr($rendered, $html);
+}
+
+/**
  * contentEx 钩子：
  *  - feed 场景：受密码保护的文章整体替换为提示，未保护文章也剥离
  *    {hide}/{password:} 块，杜绝明文密码与隐藏内容外泄
@@ -207,10 +252,19 @@ function bold_content_filter($content, $widget) {
         if (Helper::options()->protectFeed != '0' && isPasswordProtected($widget)) {
             return '<p>' . get_theme_text('feed_protected', $widget) . '</p>';
         }
+        $protected = bold_render_protected_source($widget);
+        if ($protected !== null) {
+            return $protected;
+        }
         return bold_strip_protected_markers(
             $content,
             '<p>' . get_theme_text('feed_protected', $widget) . '</p>'
         );
+    }
+
+    $protected = bold_render_protected_source($widget);
+    if ($protected !== null) {
+        $content = $protected;
     }
 
     // 渲染层代码块探测：缩进式/波浪线围栏等原文启发式测不到的写法，
@@ -236,6 +290,10 @@ function bold_excerpt_filter($excerpt, $widget) {
     if (Helper::options()->protectFeed != '0' && isPasswordProtected($widget)) {
         return '<p>' . get_theme_text('feed_protected', $widget) . '</p>';
     }
+    $protected = bold_render_protected_source($widget, true);
+    if ($protected !== null) {
+        return $protected;
+    }
     return bold_strip_protected_markers(
         $excerpt,
         '<p>' . get_theme_text('feed_protected', $widget) . '</p>'
@@ -247,20 +305,21 @@ function bold_excerpt_filter($excerpt, $widget) {
  * 不经过 contentEx/excerptEx。themeInit 时补做整篇保护或标记剥离。
  */
 function bold_protect_feed_metadata($archive) {
-    if (!bold_is_feed($archive) || Helper::options()->protectFeed == '0'
-        || !$archive->is('single') || !method_exists($archive, 'setDescription')) {
+    if (!bold_is_feed($archive) || !$archive->is('single') || !method_exists($archive, 'setDescription')) {
         return;
     }
 
     $notice = get_theme_text('feed_protected', $archive);
     try {
-        if (isPasswordProtected($archive)) {
+        if (Helper::options()->protectFeed != '0' && isPasswordProtected($archive)) {
             $archive->setDescription($notice);
             return;
         }
 
-        $description = method_exists($archive, 'getDescription')
-            ? strval($archive->getDescription()) : '';
+        // 核心可能在主题钩子注册前已把秘密脚注移出标记，须从原文重建。
+        $source = bold_parse_protected_content(strval($archive->text ?? ''));
+        $description = $source['has_markers'] ? bold_plain_text($archive, 150)
+            : (method_exists($archive, 'getDescription') ? strval($archive->getDescription()) : '');
         $archive->setDescription(bold_strip_protected_markers($description, $notice));
     } catch (Throwable $e) {
         // 无法证明频道描述公开时失败即保密。
@@ -326,7 +385,8 @@ function bold_comment_feed_item_filter($feedType, $widget) {
 /**
  * 核心逻辑：评论可见
  */
-function parseReplyContent($content, $archive) {
+function parseReplyContent($content, $archive, $htmlPlaceholder = null) {
+    $encodeHtml = $htmlPlaceholder ?: function ($html) { return $html; };
     $parsed = bold_parse_protected_content($content);
     if (!$archive->is('single')) {
         return bold_render_stripped_nodes($parsed['nodes'])
@@ -399,7 +459,8 @@ function parseReplyContent($content, $archive) {
             </div>
             ';
 
-    $render = function ($nodes) use (&$render, $hasComment, $hideNotice, $archive) {
+    $hideNotice = $encodeHtml($hideNotice);
+    $render = function ($nodes) use (&$render, $hasComment, $hideNotice, $archive, $encodeHtml) {
         $output = '';
         foreach ($nodes as $node) {
             if ($node['type'] === 'text') {
@@ -408,7 +469,7 @@ function parseReplyContent($content, $archive) {
                 $output .= $hasComment ? $render($node['children']) : $hideNotice;
             } else {
                 // 此阶段出现 password 节点说明上一步未处理，不能渲染其子节点。
-                $output .= bold_protection_notice($archive);
+                $output .= $encodeHtml(bold_protection_notice($archive));
             }
         }
         return $output;
@@ -416,12 +477,12 @@ function parseReplyContent($content, $archive) {
 
     $content = $render($parsed['nodes']);
     if ($parsed['invalid']) {
-        $content .= bold_protection_notice($archive);
+        $content .= $encodeHtml(bold_protection_notice($archive));
     }
     if ($hasComment && $hasHide) {
-        $content = '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+        $content = $encodeHtml('<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
                         <p class="font-bold text-green-700 dark:text-green-400 m-0">' . get_theme_text('unlocked', $archive) . '</p>
-                    </div>' . $content;
+                    </div>') . $content;
     }
 
     return $content;
@@ -430,7 +491,8 @@ function parseReplyContent($content, $archive) {
 /**
  * 解析内联密码保护内容 {password:密码}内容{/password}
  */
-function parseInlinePasswordContent($content, $archive) {
+function parseInlinePasswordContent($content, $archive, $htmlPlaceholder = null) {
+    $encodeHtml = $htmlPlaceholder ?: function ($html) { return $html; };
     $parsed = bold_parse_protected_content($content);
     if (!$archive->is('single')) {
         return bold_render_stripped_nodes($parsed['nodes'])
@@ -448,7 +510,7 @@ function parseInlinePasswordContent($content, $archive) {
     }
 
     $user = Typecho_Widget::widget('Widget_User');
-    $render = function ($nodes) use (&$render, $archive, $user) {
+    $render = function ($nodes) use (&$render, $archive, $user, $encodeHtml) {
         $output = '';
         foreach ($nodes as $node) {
             if ($node['type'] === 'text') {
@@ -493,25 +555,25 @@ function parseInlinePasswordContent($content, $archive) {
 
             if ($isVerified) {
                 $messageKey = $isAuthor ? 'unlocked_author' : 'unlocked';
-                $output .= '<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
+                $output .= $encodeHtml('<div class="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400 mb-6">
                                 <p class="font-bold text-green-700 dark:text-green-400 m-0">' . get_theme_text($messageKey, $archive) . '</p>
-                            </div>' . $render($node['children']);
+                            </div>') . $render($node['children']);
                 continue;
             }
 
             $errorMsg = $attempted ? get_theme_text('password_error', $archive) : '';
-            $output .= '
+            $form = '
             <div class="inline-password-container my-6">
                 <div class="inline-password-inner flex flex-col items-center justify-center text-center p-6">
                     <div class="text-4xl mb-3" aria-hidden="true">🔐</div>
                     <h4 class="text-lg font-black uppercase mb-3">' . get_theme_text('inline_password_title', $archive) . '</h4>';
 
             if ($errorMsg !== '') {
-                $output .= '<div class="bg-red-100 border-2 border-red-500 text-red-700 px-3 py-2 mb-3 font-bold text-sm" role="alert">' . $errorMsg . '</div>';
+                $form .= '<div class="bg-red-100 border-2 border-red-500 text-red-700 px-3 py-2 mb-3 font-bold text-sm" role="alert">' . $errorMsg . '</div>';
             }
 
             $csrfToken = bold_password_csrf_token($csrfContext);
-            $output .= '<form method="post" class="w-full max-w-xs">
+            $form .= '<form method="post" class="w-full max-w-xs">
                         <input type="hidden" name="bold_password_csrf" value="' . htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') . '">
                         <input type="password" name="' . $postField . '" placeholder="' . get_theme_text('inline_password_placeholder', $archive) . '"
                             aria-label="' . get_theme_text('inline_password_placeholder', $archive) . '"
@@ -522,12 +584,13 @@ function parseInlinePasswordContent($content, $archive) {
                     </form>
                 </div>
             </div>';
+            $output .= $encodeHtml($form);
         }
         return $output;
     };
 
     $content = $render($parsed['nodes']);
-    return $parsed['invalid'] ? $content . bold_protection_notice($archive) : $content;
+    return $parsed['invalid'] ? $content . $encodeHtml(bold_protection_notice($archive)) : $content;
 }
 
 /**

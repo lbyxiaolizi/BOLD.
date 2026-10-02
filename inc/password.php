@@ -34,7 +34,7 @@ function bold_make_unlock_token($password) {
  * 避免升级后继续保留可伪造的授权窗口。
  */
 function bold_check_unlock_token($token, $password) {
-    if (empty($token) || !is_string($token) || empty($password)) {
+    if (empty($token) || !is_string($token) || $password === null || strval($password) === '') {
         return false;
     }
 
@@ -393,7 +393,7 @@ function parseCategoryPasswords() {
             list($slug, $password) = explode(':', $line, 2);
             $slug = trim($slug);
             $password = trim($password);
-            if (!empty($slug) && !empty($password)) {
+            if ($slug !== '' && $password !== '') {
                 $categoryPasswords[$slug] = $password;
             }
         }
@@ -415,7 +415,7 @@ function bold_get_protected_slugs() {
     $options = Helper::options();
     $protectedSlugs = array();
 
-    if (!empty($options->passwordProtectedCategories)) {
+    if (strval($options->passwordProtectedCategories ?? '') !== '') {
         $protectedSlugs = array_map('trim', explode(',', $options->passwordProtectedCategories));
     }
 
@@ -425,7 +425,9 @@ function bold_get_protected_slugs() {
         $protectedSlugs = array_merge($protectedSlugs, array_keys($categoryPasswords));
     }
 
-    return $cache = array_values(array_unique(array_filter($protectedSlugs)));
+    return $cache = array_values(array_unique(array_filter($protectedSlugs, function ($slug) {
+        return strval($slug) !== '';
+    })));
 }
 
 /**
@@ -442,7 +444,7 @@ function bold_category_password_requirement($slug) {
     }
 
     $categoryPasswords = parseCategoryPasswords();
-    if (!empty($categoryPasswords[$slug])) {
+    if (isset($categoryPasswords[$slug]) && $categoryPasswords[$slug] !== '') {
         return array(
             'password' => $categoryPasswords[$slug],
             'source' => 'category',
@@ -452,7 +454,7 @@ function bold_category_password_requirement($slug) {
     }
 
     $options = Helper::options();
-    if (!empty($options->postPassword)) {
+    if (strval($options->postPassword ?? '') !== '') {
         return array(
             'password' => strval($options->postPassword),
             'source' => 'global',
@@ -654,19 +656,31 @@ function bold_cid_is_protected($cid) {
         return $cache[$cid];
     }
 
-    if (!empty(Helper::options()->postPassword)) {
+    if (strval(Helper::options()->postPassword ?? '') !== '') {
         return $cache[$cid] = true;
     }
 
     $db = Typecho_Db::get();
 
     // 文章自定义字段密码
-    $field = $db->fetchRow($db->select('str_value')->from('table.fields')
+    $field = $db->fetchRow($db->select('type', 'str_value', 'int_value', 'float_value')->from('table.fields')
         ->where('cid = ?', $cid)
         ->where('name = ?', 'password')
         ->limit(1));
-    if ($field && !empty($field['str_value'])) {
-        return $cache[$cid] = true;
+    if ($field) {
+        $type = strval($field['type'] ?? 'str');
+        if ($type === 'json') {
+            $value = json_decode(strval($field['str_value'] ?? ''), true);
+            $hasPassword = is_scalar($value) ? strval($value) !== '' : $value !== null;
+        } elseif (in_array($type, array('str', 'int', 'float'), true)) {
+            $hasPassword = strval($field[$type . '_value'] ?? '') !== '';
+        } else {
+            // 未知字段类型不能证明该文章公开。
+            $hasPassword = true;
+        }
+        if ($hasPassword) {
+            return $cache[$cid] = true;
+        }
     }
 
     // 加密分类
@@ -746,7 +760,7 @@ function handlePasswordVerification($archive) {
         }
     }
 
-    if (!empty($correctPassword) && hash_equals(strval($correctPassword), $inputPassword)) {
+    if ($correctPassword !== null && $correctPassword !== '' && hash_equals(strval($correctPassword), $inputPassword)) {
         $token = bold_make_unlock_token($correctPassword);
         $cookieSet = bold_set_unlock_cookie(
             $requirement['cookie'],
