@@ -230,6 +230,15 @@ body.modal-open {
 .dark-mode ::-webkit-scrollbar-thumb { background: var(--border-color); border-color: #000; }
 .dark-mode ::-webkit-scrollbar-track { background: #000; border-left: 3px solid var(--border-color); }
 
+/* 桌面根滚动条避开 body 的 md:my-8（上下 2rem）留白；
+   body 自身的伪元素选择器不影响代码块、目录等嵌套滚动区。 */
+@media (min-width: 768px) {
+    body::-webkit-scrollbar-track:vertical {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+}
+
 /* Prose 适配 */
 .dark-mode .prose { color: var(--text-main) !important; }
 .dark-mode .prose p, .dark-mode .prose ul, .dark-mode .prose ol { color: var(--text-main) !important; }
