@@ -230,15 +230,6 @@ body.modal-open {
 .dark-mode ::-webkit-scrollbar-thumb { background: var(--border-color); border-color: #000; }
 .dark-mode ::-webkit-scrollbar-track { background: #000; border-left: 3px solid var(--border-color); }
 
-/* 桌面根滚动条避开 body 的 md:my-8（上下 2rem）留白；
-   body 自身的伪元素选择器不影响代码块、目录等嵌套滚动区。 */
-@media (min-width: 768px) {
-    body::-webkit-scrollbar-track:vertical {
-        margin-top: 2rem;
-        margin-bottom: 2rem;
-    }
-}
-
 /* Prose 适配 */
 .dark-mode .prose { color: var(--text-main) !important; }
 .dark-mode .prose p, .dark-mode .prose ul, .dark-mode .prose ol { color: var(--text-main) !important; }
@@ -671,12 +662,22 @@ div.code-toolbar > .toolbar button:hover {
 
 .toc-container .toc-link {
     display: inline-block;
+    position: relative;
+    height: auto;
     max-width: calc(100% - 1.75rem);
     padding: 0.2rem 0.35rem;
     color: var(--text-main);
     line-height: 1.35;
     text-decoration: none;
     word-break: break-word;
+}
+
+/* 将 tocbot 的绝对定位指示线限制在链接内，覆盖默认 height: inherit。 */
+.toc-container .toc-link::before {
+    top: 0;
+    bottom: 0;
+    height: auto;
+    margin-top: 0;
 }
 
 .toc-container .toc-link:hover,
